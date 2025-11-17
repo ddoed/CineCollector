@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: cinecollector
+  datasource:
+    url: jdbc:postgresql://localhost:5432/cinecollector
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+  jdbc:
+    template:
+      fetch-size: 100
+
+  sql:
+    init:
+      mode: always
+
+logging:
+  level:
+    org.springframework.jdbc.core: DEBUG
