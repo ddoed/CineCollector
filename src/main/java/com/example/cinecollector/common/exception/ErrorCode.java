@@ -32,6 +32,10 @@ public enum ErrorCode {
 
     // 특전
     PERK_NOT_FOUND(404, "PERK-001" , "특전을 찾을 수 없습니다." );
+    // 극장
+    THEATER_NOT_FOUND(404, "THEATER-001", "극장을 찾을 수 없습니다." ),
+    THEATER_ACCESS_DENIED(403, "THEATER-002", "극장에 대한 접근 권한이 없습니다." ),
+    THEATER_ALREADY_EXISTS(400, "THEATER-003" , "해당 관리자의 극장이 이미 존재합니다." ),
 
     private final int status;
     private final String code;
