@@ -21,7 +21,10 @@ public enum ErrorCode {
     TOKEN_EXPIRED(401, "AUTH-002", "토큰이 만료되었습니다."),
     INVALID_TOKEN(401, "AUTH-003", "유효하지 않은 토큰입니다."),
     FORBIDDEN(403, "AUTH-004", "접근 권한이 없습니다."),
-    INVALID_PASSWORD(401, "AUTH-005", "비밀번호가 일치하지 않습니다.");
+    INVALID_PASSWORD(401, "AUTH-005", "비밀번호가 일치하지 않습니다."),
+
+    // 영화
+    MOVIE_NOT_FOUND(404, "MOVIE-001", "영화를 찾을 수 없습니다.");
 
     private final int status;
     private final String code;

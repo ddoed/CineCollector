@@ -1,0 +1,70 @@
+package com.example.cinecollector.movie.repository;
+
+import com.example.cinecollector.movie.entity.Movie;
+import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+@RequiredArgsConstructor
+public class MovieRepository {
+
+    private final JdbcTemplate jdbcTemplate;
+
+    private final RowMapper<Movie> movieMapper = (rs, rowNum) ->
+            Movie.builder()
+                    .movieId(rs.getLong("movie_id"))
+                    .title(rs.getString("title"))
+                    .releaseDate(rs.getDate("release_date") != null ?
+                            rs.getDate("release_date").toLocalDate() : null)
+                    .genre(rs.getString("genre"))
+                    .duration(rs.getInt("duration"))
+                    .build();
+
+    public Movie save(Movie movie) {
+        String sql = """
+            INSERT INTO movie (title, release_date, genre, duration)
+            VALUES (?, ?, ?, ?)
+            RETURNING movie_id, title, release_date, genre, duration
+        """;
+
+        return jdbcTemplate.queryForObject(sql, movieMapper,
+                movie.getTitle(),
+                movie.getReleaseDate(),
+                movie.getGenre(),
+                movie.getDuration()
+        );
+    }
+
+    public Optional<Movie> findById(Long id) {
+        String sql = "SELECT * FROM movie WHERE movie_id = ?";
+        return jdbcTemplate.query(sql, movieMapper, id).stream().findFirst();
+    }
+
+    public List<Movie> findAll() {
+        String sql = "SELECT * FROM movie ORDER BY movie_id DESC";
+        return jdbcTemplate.query(sql, movieMapper);
+    }
+
+    public int update(Movie movie) {
+        String sql = """
+            UPDATE movie SET title=?, release_date=?, genre=?, duration=?
+            WHERE movie_id=?
+        """;
+        return jdbcTemplate.update(sql,
+                movie.getTitle(),
+                movie.getReleaseDate(),
+                movie.getGenre(),
+                movie.getDuration(),
+                movie.getMovieId());
+    }
+
+    public int delete(Long id) {
+        return jdbcTemplate.update("DELETE FROM movie WHERE movie_id=?", id);
+    }
+}
+

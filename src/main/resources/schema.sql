@@ -1,4 +1,5 @@
 DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS movie CASCADE;
 
 CREATE TABLE IF NOT EXISTS users (
     user_id BIGSERIAL PRIMARY KEY,
@@ -7,3 +8,11 @@ CREATE TABLE IF NOT EXISTS users (
     password VARCHAR(255) NOT NULL,
     role VARCHAR(50) NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS movie (
+    movie_id SERIAL PRIMARY KEY,
+    title VARCHAR(100) NOT NULL,
+    release_date DATE,
+    genre VARCHAR(50),
+    duration INT
+)
