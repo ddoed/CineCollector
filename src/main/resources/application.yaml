@@ -18,3 +18,4 @@ spring:
 logging:
   level:
     org.springframework.jdbc.core: DEBUG
+    org.springframework.jdbc.core.JdbcTemplate: DEBUG
