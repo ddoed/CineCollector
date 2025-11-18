@@ -6,6 +6,10 @@ spring:
     driver-class-name: org.postgresql.Driver
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+    property-naming-strategy: SNAKE_CASE
 
   jdbc:
     template:
@@ -19,3 +23,8 @@ logging:
   level:
     org.springframework.jdbc.core: DEBUG
     org.springframework.jdbc.core.JdbcTemplate: DEBUG
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expire-time: ${JWT_ACCESS_EXPIRE:3600000}     # 1시간
+  refresh-token-expire-time: ${JWT_REFRESH_EXPIRE:1209600000} # 2주
