@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS inventories CASCADE;
 DROP TABLE IF EXISTS theaters CASCADE;
 DROP TABLE IF EXISTS perks CASCADE;
 DROP TABLE IF EXISTS events CASCADE;
@@ -61,5 +62,22 @@ CREATE TABLE IF NOT EXISTS theaters (
 
     CONSTRAINT fk_theater_user
     FOREIGN KEY (manager_id) REFERENCES users(user_id)
+    ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS inventories (
+    theater_id BIGINT NOT NULL,
+    perk_id BIGINT NOT NULL,
+    stock INT,
+    status VARCHAR(20),
+
+    CONSTRAINT pk_inventory PRIMARY KEY (theater_id, perk_id),
+
+    CONSTRAINT fk_inventory_theater
+    FOREIGN KEY (theater_id) REFERENCES theaters(theater_id)
+    ON DELETE CASCADE,
+
+    CONSTRAINT fk_inventory_perk
+    FOREIGN KEY (perk_id) REFERENCES perks(perk_id)
     ON DELETE CASCADE
 );

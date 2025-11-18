@@ -31,11 +31,17 @@ public enum ErrorCode {
     EVENT_ACCESS_DENIED(403, "EVENT-002", "해당 이벤트에 대한 접근 권한이 없습니다." ),
 
     // 특전
-    PERK_NOT_FOUND(404, "PERK-001" , "특전을 찾을 수 없습니다." );
+    PERK_NOT_FOUND(404, "PERK-001" , "특전을 찾을 수 없습니다." ),
+    PERK_ACCESS_DENIED(403, "PERK-002" , "해당 특전에 대한 접근 권한이 없습니다." ),
+
     // 극장
     THEATER_NOT_FOUND(404, "THEATER-001", "극장을 찾을 수 없습니다." ),
     THEATER_ACCESS_DENIED(403, "THEATER-002", "극장에 대한 접근 권한이 없습니다." ),
     THEATER_ALREADY_EXISTS(400, "THEATER-003" , "해당 관리자의 극장이 이미 존재합니다." ),
+
+    // 특전 재고
+    INVENTORY_NOT_FOUND(404, "INVENTORY-001" , "해당 재고를 찾을 수 없습니다." );
+
 
     private final int status;
     private final String code;
