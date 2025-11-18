@@ -9,7 +9,6 @@ import com.example.cinecollector.movie.entity.Movie;
 import com.example.cinecollector.movie.repository.MovieRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -20,7 +19,7 @@ public class MovieService {
 
     private final MovieRepository movieRepository;
 
-    public MovieResponseDto create(MovieCreateRequestDto dto) {
+    public MovieResponseDto createMovie(MovieCreateRequestDto dto) {
 
         Movie movie = Movie.builder()
                 .title(dto.getTitle())
@@ -34,22 +33,22 @@ public class MovieService {
         return MovieResponseDto.from(saved);
     }
 
-    public MovieResponseDto get(Long id) {
-        Movie movie = movieRepository.findById(id)
+    public MovieResponseDto getMovie(Long movieId) {
+        Movie movie = movieRepository.findById(movieId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MOVIE_NOT_FOUND));
 
         return MovieResponseDto.from(movie);
     }
 
-    public List<MovieResponseDto> getList() {
+    public List<MovieResponseDto> getAllMovie() {
         return movieRepository.findAll().stream()
                 .map(MovieResponseDto::from)
                 .toList();
     }
 
-    public MovieResponseDto update(Long id, MovieUpdateRequestDto dto) {
+    public MovieResponseDto updateMovie(Long movieId, MovieUpdateRequestDto dto) {
 
-        Movie original = movieRepository.findById(id)
+        Movie original = movieRepository.findById(movieId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MOVIE_NOT_FOUND));
 
         String title = dto.getTitle() != null ? dto.getTitle() : original.getTitle();
@@ -70,8 +69,8 @@ public class MovieService {
         return MovieResponseDto.from(updatedEntity);
     }
 
-    public void delete(Long id) {
-        movieRepository.delete(id);
+    public void deleteMovie(Long movieId) {
+        movieRepository.delete(movieId);
     }
 }
 

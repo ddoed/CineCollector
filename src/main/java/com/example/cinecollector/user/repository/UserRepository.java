@@ -16,7 +16,7 @@ public class UserRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
-    private final RowMapper<User> userRowMapper = (rs, rowNum) ->
+    private final RowMapper<User> rowMapper = (rs, rowNum) ->
             User.builder()
                     .userId(rs.getLong("user_id"))
                     .name(rs.getString("name"))
@@ -27,7 +27,7 @@ public class UserRepository {
 
     public Optional<User> findByEmail(String email) {
         String sql = "SELECT * FROM users WHERE email = ?";
-        List<User> result = jdbcTemplate.query(sql, userRowMapper, email);
+        List<User> result = jdbcTemplate.query(sql, rowMapper, email);
         return result.stream().findFirst();
     }
 
@@ -38,7 +38,7 @@ public class UserRepository {
                 RETURNING user_id, name, email, password, role
                 """;
 
-        return jdbcTemplate.queryForObject(sql, userRowMapper,
+        return jdbcTemplate.queryForObject(sql, rowMapper,
                 user.getName(),
                 user.getEmail(),
                 user.getPassword(),
@@ -48,7 +48,7 @@ public class UserRepository {
 
     public Optional<User> findById(Long id) {
         String sql = "SELECT * FROM users WHERE user_id = ?";
-        List<User> users = jdbcTemplate.query(sql, userRowMapper, id);
+        List<User> users = jdbcTemplate.query(sql, rowMapper, id);
         return users.stream().findFirst();
     }
 }

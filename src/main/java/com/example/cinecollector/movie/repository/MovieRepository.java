@@ -15,7 +15,7 @@ public class MovieRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
-    private final RowMapper<Movie> movieMapper = (rs, rowNum) ->
+    private final RowMapper<Movie> rowMapper = (rs, rowNum) ->
             Movie.builder()
                     .movieId(rs.getLong("movie_id"))
                     .title(rs.getString("title"))
@@ -27,12 +27,12 @@ public class MovieRepository {
 
     public Movie save(Movie movie) {
         String sql = """
-            INSERT INTO movie (title, release_date, genre, duration)
+            INSERT INTO movies (title, release_date, genre, duration)
             VALUES (?, ?, ?, ?)
             RETURNING movie_id, title, release_date, genre, duration
         """;
 
-        return jdbcTemplate.queryForObject(sql, movieMapper,
+        return jdbcTemplate.queryForObject(sql, rowMapper,
                 movie.getTitle(),
                 movie.getReleaseDate(),
                 movie.getGenre(),
@@ -41,18 +41,18 @@ public class MovieRepository {
     }
 
     public Optional<Movie> findById(Long id) {
-        String sql = "SELECT * FROM movie WHERE movie_id = ?";
-        return jdbcTemplate.query(sql, movieMapper, id).stream().findFirst();
+        String sql = "SELECT * FROM movies WHERE movie_id = ?";
+        return jdbcTemplate.query(sql, rowMapper, id).stream().findFirst();
     }
 
     public List<Movie> findAll() {
-        String sql = "SELECT * FROM movie ORDER BY movie_id DESC";
-        return jdbcTemplate.query(sql, movieMapper);
+        String sql = "SELECT * FROM movies ORDER BY movie_id DESC";
+        return jdbcTemplate.query(sql, rowMapper);
     }
 
     public int update(Movie movie) {
         String sql = """
-            UPDATE movie SET title=?, release_date=?, genre=?, duration=?
+            UPDATE movies SET title=?, release_date=?, genre=?, duration=?
             WHERE movie_id=?
         """;
         return jdbcTemplate.update(sql,
@@ -64,7 +64,7 @@ public class MovieRepository {
     }
 
     public int delete(Long id) {
-        return jdbcTemplate.update("DELETE FROM movie WHERE movie_id=?", id);
+        return jdbcTemplate.update("DELETE FROM movies WHERE movie_id=?", id);
     }
 }
 

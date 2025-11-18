@@ -21,19 +21,19 @@ public class MovieController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<MovieResponseDto>> createMovie(@Valid @RequestBody MovieCreateRequestDto dto) {
-        MovieResponseDto created = movieService.create(dto);
+        MovieResponseDto created = movieService.createMovie(dto);
         return ResponseEntity.ok(ApiResponse.success(created));
     }
 
     @GetMapping("/{movieId}")
     public ResponseEntity<ApiResponse<MovieResponseDto>> getMovie(@PathVariable Long movieId) {
-        MovieResponseDto movie = movieService.get(movieId);
+        MovieResponseDto movie = movieService.getMovie(movieId);
         return ResponseEntity.ok(ApiResponse.success(movie));
     }
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<MovieResponseDto>>> getMovies() {
-        return ResponseEntity.ok(ApiResponse.success(movieService.getList()));
+        return ResponseEntity.ok(ApiResponse.success(movieService.getAllMovie()));
     }
 
     @PatchMapping("/{movieId}")
@@ -41,13 +41,13 @@ public class MovieController {
             @PathVariable Long movieId,
             @Valid @RequestBody MovieUpdateRequestDto dto
     ) {
-        MovieResponseDto updated = movieService.update(movieId, dto);
+        MovieResponseDto updated = movieService.updateMovie(movieId, dto);
         return ResponseEntity.ok(ApiResponse.success(updated));
     }
 
     @DeleteMapping("/{movieId}")
     public ResponseEntity<ApiResponse<Void>> deleteMovie(@PathVariable Long movieId) {
-        movieService.delete(movieId);
+        movieService.deleteMovie(movieId);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 }
