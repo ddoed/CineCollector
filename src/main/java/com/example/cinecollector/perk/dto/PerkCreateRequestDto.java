@@ -9,6 +9,7 @@ import lombok.Getter;
 public class PerkCreateRequestDto {
 
     @NotNull
+    @JsonProperty("event_id")
     private Long eventId;
 
     @NotBlank
