@@ -24,7 +24,7 @@ public class TheaterRepository {
 
     public Theater save(Theater t) {
         String sql = """
-            INSERT INTO theater(name, location, manager_id)
+            INSERT INTO theaters(name, location, manager_id)
             VALUES (?, ?, ?)
             RETURNING theater_id, name, location, manager_id
         """;
@@ -34,22 +34,22 @@ public class TheaterRepository {
     }
 
     public Optional<Theater> findById(Long id) {
-        String sql = "SELECT * FROM theater WHERE theater_id = ?";
+        String sql = "SELECT * FROM theaters WHERE theater_id = ?";
         return jdbcTemplate.query(sql, rowMapper, id).stream().findFirst();
     }
 
     public Optional<Theater> findByManagerId(Long managerId) {
-        String sql = "SELECT * FROM theater WHERE manager_id = ?";
+        String sql = "SELECT * FROM theaters WHERE manager_id = ?";
         return jdbcTemplate.query(sql, rowMapper, managerId).stream().findFirst();
     }
 
     public List<Theater> findAll() {
-        return jdbcTemplate.query("SELECT * FROM theater", rowMapper);
+        return jdbcTemplate.query("SELECT * FROM theaters", rowMapper);
     }
 
     public void update(Theater t) {
         String sql = """
-            UPDATE theater
+            UPDATE theaters
             SET name = ?, location = ?
             WHERE theater_id = ?
         """;
@@ -59,7 +59,7 @@ public class TheaterRepository {
     }
 
     public void delete(Long id) {
-        jdbcTemplate.update("DELETE FROM theater WHERE theater_id = ?", id);
+        jdbcTemplate.update("DELETE FROM theaters WHERE theater_id = ?", id);
     }
 }
 
