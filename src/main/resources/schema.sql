@@ -4,7 +4,7 @@ DROP TABLE IF EXISTS perks CASCADE;
 DROP TABLE IF EXISTS events CASCADE;
 DROP TABLE IF EXISTS movies CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
-
+DROP TABLE IF EXISTS collections CASCADE;
 
 CREATE TABLE IF NOT EXISTS users (
     user_id BIGSERIAL PRIMARY KEY,
@@ -81,3 +81,20 @@ CREATE TABLE IF NOT EXISTS inventories (
     FOREIGN KEY (perk_id) REFERENCES perks(perk_id)
     ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS collections (
+    user_id     BIGINT NOT NULL,
+    perk_id     BIGINT NOT NULL,
+    obtained_date DATE,
+    quantity    INT NOT NULL,
+
+    CONSTRAINT pk_collections PRIMARY KEY (user_id, perk_id),
+
+    CONSTRAINT fk_collection_user
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+    ON DELETE CASCADE,
+
+    CONSTRAINT fk_collection_perk
+    FOREIGN KEY (perk_id) REFERENCES perks(perk_id)
+    ON DELETE CASCADE
+    );

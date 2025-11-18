@@ -40,7 +40,10 @@ public enum ErrorCode {
     THEATER_ALREADY_EXISTS(400, "THEATER-003" , "해당 관리자의 극장이 이미 존재합니다." ),
 
     // 특전 재고
-    INVENTORY_NOT_FOUND(404, "INVENTORY-001" , "해당 재고를 찾을 수 없습니다." );
+    INVENTORY_NOT_FOUND(404, "INVENTORY-001" , "해당 재고를 찾을 수 없습니다." ),
+
+    // 도감
+    COLLECTION_NOT_FOUND(404, "COLLECTION-001" , "도감을 찾을 수 없습니다." ),;
 
 
     private final int status;
