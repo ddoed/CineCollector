@@ -1,6 +1,7 @@
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS movies CASCADE;
 DROP TABLE IF EXISTS events CASCADE;
+DROP TABLE IF EXISTS perks CASCADE;
 
 CREATE TABLE IF NOT EXISTS users (
     user_id BIGSERIAL PRIMARY KEY,
@@ -11,7 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS movies (
-    movie_id SERIAL PRIMARY KEY,
+    movie_id BIGSERIAL PRIMARY KEY,
     title VARCHAR(100) NOT NULL,
     release_date DATE,
     genre VARCHAR(50),
@@ -33,5 +34,19 @@ CREATE TABLE IF NOT EXISTS events (
 
     CONSTRAINT fk_event_creator
     FOREIGN KEY (creator_id) REFERENCES users(user_id)
+    ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS perks (
+    perk_id         BIGSERIAL PRIMARY KEY,
+    event_id        BIGINT NOT NULL,
+    name            VARCHAR(100) NOT NULL,
+    type            VARCHAR(50),
+    limit_per_user  INT,
+    quantity        INT,
+    description     VARCHAR(255),
+
+    CONSTRAINT fk_perk_event
+    FOREIGN KEY (event_id) REFERENCES events(event_id)
     ON DELETE CASCADE
 );
