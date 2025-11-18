@@ -11,6 +11,7 @@ import java.time.LocalDate;
 public class EventCreateRequestDto {
 
     @NotNull
+    @JsonProperty("movie_id")
     private Long movieId;
 
     @NotBlank(message = "제목은 필수 값 입니다.")
