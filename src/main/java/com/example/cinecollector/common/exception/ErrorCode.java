@@ -24,7 +24,11 @@ public enum ErrorCode {
     INVALID_PASSWORD(401, "AUTH-005", "비밀번호가 일치하지 않습니다."),
 
     // 영화
-    MOVIE_NOT_FOUND(404, "MOVIE-001", "영화를 찾을 수 없습니다.");
+    MOVIE_NOT_FOUND(404, "MOVIE-001", "영화를 찾을 수 없습니다."),
+
+    // 이벤트
+    EVENT_NOT_FOUND(404, "EVENT-001", "이벤트를 찾을 수 없습니다."),
+    EVENT_ACCESS_DENIED(403, "EVENT-002", "해당 이벤트에 대한 접근 권한이 없습니다." ),;
 
     private final int status;
     private final String code;

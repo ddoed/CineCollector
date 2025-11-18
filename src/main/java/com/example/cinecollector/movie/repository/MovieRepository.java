@@ -1,6 +1,7 @@
 package com.example.cinecollector.movie.repository;
 
 import com.example.cinecollector.movie.entity.Movie;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -65,6 +66,12 @@ public class MovieRepository {
 
     public int delete(Long id) {
         return jdbcTemplate.update("DELETE FROM movies WHERE movie_id=?", id);
+    }
+
+    public boolean existsById(@NotNull Long movieId) {
+        String sql = "SELECT EXISTS (SELECT 1 FROM movies WHERE movie_id = ?)";
+        Boolean exists = jdbcTemplate.queryForObject(sql, Boolean.class, movieId);
+        return exists != null && exists;
     }
 }
 
