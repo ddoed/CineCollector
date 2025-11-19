@@ -32,7 +32,8 @@ public class TheaterService {
                 .managerId(managerId)
                 .build();
 
-        return TheaterResponseDto.from(theaterRepository.save(t));
+        Theater save = theaterRepository.save(t);
+        return TheaterResponseDto.from(save);
     }
 
     public TheaterResponseDto getTheater(Long theaterId) {
@@ -64,8 +65,8 @@ public class TheaterService {
                 .location(dto.getLocation() != null ? dto.getLocation() : origin.getLocation())
                 .build();
 
-        theaterRepository.update(updated);
-        return TheaterResponseDto.from(updated);
+        Theater update = theaterRepository.update(updated);
+        return TheaterResponseDto.from(update);
     }
 
     @Transactional

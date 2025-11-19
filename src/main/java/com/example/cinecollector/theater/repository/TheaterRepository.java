@@ -47,15 +47,19 @@ public class TheaterRepository {
         return jdbcTemplate.query("SELECT * FROM theaters", rowMapper);
     }
 
-    public void update(Theater t) {
+    public Theater update(Theater t) {
         String sql = """
             UPDATE theaters
             SET name = ?, location = ?
             WHERE theater_id = ?
+            RETURNING *
         """;
 
-        jdbcTemplate.update(sql,
-                t.getName(), t.getLocation(), t.getTheaterId());
+        return jdbcTemplate.queryForObject(sql, rowMapper,
+                t.getName(),
+                t.getLocation(),
+                t.getTheaterId()
+        );
     }
 
     public void delete(Long id) {
