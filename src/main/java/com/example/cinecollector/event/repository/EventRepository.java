@@ -45,15 +45,21 @@ public class EventRepository {
         return list.stream().findFirst();
     }
 
-    public void update(Event e) {
+    public Event update(Event e) {
         String sql = """
             UPDATE events 
             SET title = ?, start_date = ?, end_date = ?, week_no = ?
             WHERE event_id = ?
-            """;
+            RETURNING *
+        """;
 
-        jdbcTemplate.update(sql,
-                e.getTitle(), e.getStartDate(), e.getEndDate(), e.getWeekNo(), e.getEventId());
+        return jdbcTemplate.queryForObject(sql, rowMapper,
+                e.getTitle(),
+                e.getStartDate(),
+                e.getEndDate(),
+                e.getWeekNo(),
+                e.getEventId()
+        );
     }
 
     public void delete(Long id) {

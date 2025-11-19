@@ -50,8 +50,8 @@ public class InventoryService {
                 .status(dto.getStatus())
                 .build();
 
-        inventoryRepository.save(inv);
-        return InventoryResponseDto.from(inv);
+        Inventory save = inventoryRepository.save(inv);
+        return InventoryResponseDto.from(save);
     }
 
     @Transactional
@@ -73,8 +73,8 @@ public class InventoryService {
                 .status(dto.getStatus() != null ? dto.getStatus() : origin.getStatus())
                 .build();
 
-        inventoryRepository.update(updated);
-        return InventoryResponseDto.from(updated);
+        Inventory update = inventoryRepository.update(updated);
+        return InventoryResponseDto.from(update);
     }
 
     @Transactional

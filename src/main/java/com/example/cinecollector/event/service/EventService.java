@@ -58,8 +58,8 @@ public class EventService {
                 .weekNo(dto.getWeekNo() != null ? dto.getWeekNo() : origin.getWeekNo())
                 .build();
 
-        eventRepository.update(updated);
-        return EventResponseDto.from(updated);
+        Event update = eventRepository.update(updated);
+        return EventResponseDto.from(update);
     }
 
     public EventResponseDto getEvent(Long eventId) {

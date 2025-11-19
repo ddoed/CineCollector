@@ -34,8 +34,8 @@ public class CollectionService {
                 .obtainedDate(dto.getObtainedDate())
                 .build();
 
-        collectionRepository.save(c);
-        return CollectionResponseDto.from(c);
+        Collection save = collectionRepository.save(c);
+        return CollectionResponseDto.from(save);
     }
 
     @Transactional
@@ -51,8 +51,8 @@ public class CollectionService {
                 .obtainedDate(dto.getObtainedDate() != null ? dto.getObtainedDate() : origin.getObtainedDate())
                 .build();
 
-        collectionRepository.update(updated);
-        return CollectionResponseDto.from(updated);
+        Collection update = collectionRepository.update(updated);
+        return CollectionResponseDto.from(update);
     }
 
     @Transactional

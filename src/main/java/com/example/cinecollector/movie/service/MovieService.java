@@ -56,7 +56,7 @@ public class MovieService {
         String genre = dto.getGenre() != null ? dto.getGenre() : original.getGenre();
         Integer duration = dto.getDuration() != null ? dto.getDuration() : original.getDuration();
 
-        Movie updatedEntity = Movie.builder()
+        Movie updated = Movie.builder()
                 .movieId(original.getMovieId())
                 .title(title)
                 .releaseDate(releaseDate)
@@ -64,9 +64,9 @@ public class MovieService {
                 .duration(duration)
                 .build();
 
-        movieRepository.update(updatedEntity);
+        Movie update = movieRepository.update(updated);
 
-        return MovieResponseDto.from(updatedEntity);
+        return MovieResponseDto.from(update);
     }
 
     public void deleteMovie(Long movieId) {

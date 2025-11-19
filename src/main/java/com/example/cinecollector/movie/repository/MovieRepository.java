@@ -51,17 +51,20 @@ public class MovieRepository {
         return jdbcTemplate.query(sql, rowMapper);
     }
 
-    public int update(Movie movie) {
+    public Movie update(Movie movie) {
         String sql = """
             UPDATE movies SET title=?, release_date=?, genre=?, duration=?
             WHERE movie_id=?
+            RETURNING *
         """;
-        return jdbcTemplate.update(sql,
+
+        return jdbcTemplate.queryForObject(sql, rowMapper,
                 movie.getTitle(),
                 movie.getReleaseDate(),
                 movie.getGenre(),
                 movie.getDuration(),
-                movie.getMovieId());
+                movie.getMovieId()
+        );
     }
 
     public int delete(Long id) {

@@ -67,8 +67,8 @@ public class PerkService {
                 .description(dto.getDescription() != null ? dto.getDescription() : origin.getDescription())
                 .build();
 
-        perkRepository.update(updated);
-        return PerkResponseDto.from(updated);
+        Perk update = perkRepository.update(updated);
+        return PerkResponseDto.from(update);
     }
 
     @Transactional

@@ -24,13 +24,14 @@ public class InventoryRepository {
                     .status(PerkStatus.valueOf(rs.getString("status")))
                     .build();
 
-    public void save(Inventory inv) {
+    public Inventory save(Inventory inv) {
         String sql = """
                 INSERT INTO inventories (theater_id, perk_id, stock, status)
                 VALUES (?, ?, ?, ?)
+                RETURNING *
             """;
 
-        jdbcTemplate.update(sql,
+        return jdbcTemplate.queryForObject(sql, rowMapper,
                 inv.getTheaterId(),
                 inv.getPerkId(),
                 inv.getStock(),
@@ -44,13 +45,15 @@ public class InventoryRepository {
         return result.stream().findFirst();
     }
 
-    public void update(Inventory inv) {
+    public Inventory update(Inventory inv) {
         String sql = """
                 UPDATE inventories
                 SET stock = ?, status = ?
                 WHERE theater_id = ? AND perk_id = ?
+                RETURNING *
             """;
-        jdbcTemplate.update(sql,
+
+        return jdbcTemplate.queryForObject(sql, rowMapper,
                 inv.getStock(),
                 inv.getStatus().name(),
                 inv.getTheaterId(),

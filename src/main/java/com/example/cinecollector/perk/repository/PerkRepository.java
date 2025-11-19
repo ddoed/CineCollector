@@ -54,13 +54,15 @@ public class PerkRepository {
         return jdbcTemplate.query(sql, rowMapper, eventId);
     }
 
-    public void update(Perk perk) {
+    public Perk update(Perk perk) {
         String sql = """
             UPDATE perks
             SET name = ?, type = ?, limit_per_user = ?, quantity = ?, description = ?
             WHERE perk_id = ?
+            RETURNING *
         """;
-        jdbcTemplate.update(sql,
+
+        return jdbcTemplate.queryForObject(sql, rowMapper,
                 perk.getName(),
                 perk.getType(),
                 perk.getLimitPerUser(),

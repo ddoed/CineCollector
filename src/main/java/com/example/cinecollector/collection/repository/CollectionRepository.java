@@ -2,6 +2,7 @@ package com.example.cinecollector.collection.repository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 import com.example.cinecollector.collection.entity.Collection;
 
@@ -14,42 +15,49 @@ public class CollectionRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
-    public void save(Collection c) {
+    private final RowMapper<Collection> rowMapper = (rs, rowNum) ->
+            Collection.builder()
+                    .userId(rs.getLong("user_id"))
+                    .perkId(rs.getLong("perk_id"))
+                    .quantity(rs.getInt("quantity"))
+                    .obtainedDate(rs.getDate("obtained_date") != null
+                            ? rs.getDate("obtained_date").toLocalDate()
+                            : null)
+                    .build();
+
+    public Collection save(Collection c) {
         String sql = """
             INSERT INTO collections (user_id, perk_id, quantity, obtained_date)
             VALUES (?, ?, ?, ?)
+            RETURNING *
         """;
 
-        jdbcTemplate.update(sql, c.getUserId(), c.getPerkId(), c.getQuantity(), c.getObtainedDate());
+        return jdbcTemplate.queryForObject(sql, rowMapper,
+                c.getUserId(),
+                c.getPerkId(),
+                c.getQuantity(),
+                c.getObtainedDate()
+        );
     }
 
     public Optional<Collection> findById(Long userId, Long perkId) {
         String sql = "SELECT * FROM collections WHERE user_id = ? AND perk_id = ?";
-
-        List<Collection> list = jdbcTemplate.query(sql, (rs, n) ->
-                        Collection.builder()
-                                .userId(rs.getLong("user_id"))
-                                .perkId(rs.getLong("perk_id"))
-                                .quantity(rs.getInt("quantity"))
-                                .obtainedDate(rs.getDate("obtained_date") != null
-                                        ? rs.getDate("obtained_date").toLocalDate() : null)
-                                .build(),
-                userId, perkId
-        );
-
-        return list.stream().findFirst();
+        return jdbcTemplate.query(sql, rowMapper, userId, perkId).stream().findFirst();
     }
 
-    public void update(Collection c) {
+    public Collection update(Collection c) {
         String sql = """
             UPDATE collections
             SET quantity = ?, obtained_date = ?
             WHERE user_id = ? AND perk_id = ?
+            RETURNING *
         """;
 
-        jdbcTemplate.update(sql,
-                c.getQuantity(), c.getObtainedDate(),
-                c.getUserId(), c.getPerkId()
+        return jdbcTemplate.queryForObject(sql, rowMapper,
+                c.getQuantity(),
+                c.getObtainedDate(),
+                c.getUserId(),
+                c.getPerkId()
         );
     }
 
@@ -59,18 +67,14 @@ public class CollectionRepository {
     }
 
     public List<Collection> findAllByUserId(Long userId) {
-        String sql = "SELECT * FROM collections WHERE user_id = ? ORDER BY obtained_date DESC NULLS LAST";
+        String sql = """
+            SELECT *
+            FROM collections
+            WHERE user_id = ?
+            ORDER BY obtained_date DESC NULLS LAST
+        """;
 
-        return jdbcTemplate.query(sql, (rs, n) ->
-                        Collection.builder()
-                                .userId(rs.getLong("user_id"))
-                                .perkId(rs.getLong("perk_id"))
-                                .quantity(rs.getInt("quantity"))
-                                .obtainedDate(rs.getDate("obtained_date") != null
-                                        ? rs.getDate("obtained_date").toLocalDate() : null)
-                                .build(),
-                userId
-        );
+        return jdbcTemplate.query(sql, rowMapper, userId);
     }
 }
 
