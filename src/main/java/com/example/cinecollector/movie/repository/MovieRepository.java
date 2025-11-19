@@ -76,5 +76,13 @@ public class MovieRepository {
         Boolean exists = jdbcTemplate.queryForObject(sql, Boolean.class, movieId);
         return exists != null && exists;
     }
+
+    public String findMovieTitle(Long movieId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT title FROM movies WHERE movie_id = ?",
+                String.class,
+                movieId
+        );
+    }
 }
 
