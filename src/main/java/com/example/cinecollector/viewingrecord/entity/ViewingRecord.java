@@ -3,6 +3,7 @@ package com.example.cinecollector.viewingrecord.entity;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.sql.Timestamp;
 import java.time.LocalDate;
 
 @Getter
@@ -16,5 +17,7 @@ public class ViewingRecord {
     private LocalDate viewDate;
     private String review;
     private Boolean isPublic;
+    private Timestamp createdAt;
+    private Float rating;
 }
 

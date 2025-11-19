@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Getter
 public class ViewingRecordCreateRequestDto {
@@ -24,5 +25,13 @@ public class ViewingRecordCreateRequestDto {
 
     @JsonProperty("is_public")
     private Boolean isPublic;
+
+    private Float rating;
+
+    @JsonProperty("image_urls")
+    private List<String> imageUrls;
+
+    @JsonProperty("perk_ids")
+    private List<Long> perkIds;
 }
 

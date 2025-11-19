@@ -4,6 +4,7 @@ import com.example.cinecollector.viewingrecord.entity.ViewingRecord;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.sql.Timestamp;
 import java.time.LocalDate;
 
 @Getter
@@ -17,6 +18,8 @@ public class ViewingRecordResponseDto {
     private LocalDate viewDate;
     private String review;
     private Boolean isPublic;
+    private Timestamp createdAt;
+    private Float rating;
 
     public static ViewingRecordResponseDto from(ViewingRecord v) {
         return ViewingRecordResponseDto.builder()
@@ -27,6 +30,8 @@ public class ViewingRecordResponseDto {
                 .viewDate(v.getViewDate())
                 .review(v.getReview())
                 .isPublic(v.getIsPublic())
+                .createdAt(v.getCreatedAt())
+                .rating(v.getRating())
                 .build();
     }
 }

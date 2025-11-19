@@ -57,5 +57,11 @@ public class ViewingRecordController {
         List<ViewingRecordResponseDto> list = viewingRecordService.getMyRecords(userId);
         return ResponseEntity.ok(ApiResponse.success(list));
     }
+
+    @GetMapping("/home")
+    public ResponseEntity<ApiResponse<List<HomeViewingRecordDto>>> getHomeRecords() {
+        List<HomeViewingRecordDto> list = viewingRecordService.getHomeRecords();
+        return ResponseEntity.ok(ApiResponse.success(list));
+    }
 }
 

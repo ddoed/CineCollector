@@ -25,13 +25,15 @@ public class ViewingRecordRepository {
                             ? rs.getDate("view_date").toLocalDate() : null)
                     .review(rs.getString("review"))
                     .isPublic(rs.getBoolean("is_public"))
+                    .createdAt(rs.getTimestamp("created_at"))
+                    .rating(rs.getFloat("rating"))
                     .build();
 
     public ViewingRecord save(ViewingRecord v) {
         String sql = """
             INSERT INTO viewing_records
-            (user_id, movie_id, theater_id, view_date, review, is_public)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (user_id, movie_id, theater_id, view_date, review, is_public, rating, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             RETURNING *
         """;
 
@@ -41,7 +43,8 @@ public class ViewingRecordRepository {
                 v.getTheaterId(),
                 v.getViewDate(),
                 v.getReview(),
-                v.getIsPublic()
+                v.getIsPublic(),
+                v.getRating()
         );
     }
 
@@ -53,7 +56,7 @@ public class ViewingRecordRepository {
     public ViewingRecord update(ViewingRecord v) {
         String sql = """
             UPDATE viewing_records
-            SET view_date = ?, review = ?, is_public = ?
+            SET view_date = ?, review = ?, is_public = ?, rating = ?
             WHERE record_id = ?
             RETURNING *
         """;
@@ -62,6 +65,7 @@ public class ViewingRecordRepository {
                 v.getViewDate(),
                 v.getReview(),
                 v.getIsPublic(),
+                v.getRating(),
                 v.getRecordId()
         );
     }
@@ -79,6 +83,17 @@ public class ViewingRecordRepository {
         """;
 
         return jdbcTemplate.query(sql, rowMapper, userId);
+    }
+
+    public List<ViewingRecord> findAllPublicRecords() {
+        String sql = """
+            SELECT *
+            FROM viewing_records
+            WHERE is_public = true
+            ORDER BY created_at DESC
+        """;
+
+        return jdbcTemplate.query(sql, rowMapper);
     }
 }
 

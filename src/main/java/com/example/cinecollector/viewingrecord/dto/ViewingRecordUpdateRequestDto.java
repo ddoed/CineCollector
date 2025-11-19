@@ -15,4 +15,6 @@ public class ViewingRecordUpdateRequestDto {
 
     @JsonProperty("is_public")
     private Boolean isPublic;
+
+    private Float rating;
 }
