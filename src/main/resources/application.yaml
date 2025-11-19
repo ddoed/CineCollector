@@ -19,6 +19,15 @@ spring:
     init:
       mode: always
 
+aws:
+  s3:
+    bucket: ${BUCKET_NAME}
+  credentials:
+    access-key: ${AWS_ACCESS_KEY}
+    secret-key: ${AWS_SECRET_KEY}
+  region: ${BUCKET_REGION}
+
+
 logging:
   level:
     org.springframework.jdbc.core: DEBUG
