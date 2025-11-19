@@ -5,6 +5,7 @@ DROP TABLE IF EXISTS events CASCADE;
 DROP TABLE IF EXISTS movies CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS collections CASCADE;
+DROP TABLE IF EXISTS viewing_records CASCADE;
 
 CREATE TABLE IF NOT EXISTS users (
     user_id BIGSERIAL PRIMARY KEY,
@@ -97,4 +98,27 @@ CREATE TABLE IF NOT EXISTS collections (
     CONSTRAINT fk_collection_perk
     FOREIGN KEY (perk_id) REFERENCES perks(perk_id)
     ON DELETE CASCADE
-    );
+);
+
+CREATE TABLE IF NOT EXISTS viewing_records (
+    record_id   BIGSERIAL PRIMARY KEY,
+    user_id     BIGINT NOT NULL,
+    movie_id    BIGINT NOT NULL,
+    theater_id  BIGINT NOT NULL,
+    view_date   DATE,
+    review      TEXT,
+    is_public   BOOLEAN NOT NULL DEFAULT FALSE,
+
+    CONSTRAINT fk_viewing_user
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+    ON DELETE CASCADE,
+
+    CONSTRAINT fk_viewing_movie
+    FOREIGN KEY (movie_id) REFERENCES movies(movie_id)
+    ON DELETE CASCADE,
+
+    CONSTRAINT fk_viewing_theater
+    FOREIGN KEY (theater_id) REFERENCES theaters(theater_id)
+    ON DELETE CASCADE
+);
+

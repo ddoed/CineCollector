@@ -43,7 +43,11 @@ public enum ErrorCode {
     INVENTORY_NOT_FOUND(404, "INVENTORY-001" , "해당 재고를 찾을 수 없습니다." ),
 
     // 도감
-    COLLECTION_NOT_FOUND(404, "COLLECTION-001" , "도감을 찾을 수 없습니다." ),;
+    COLLECTION_NOT_FOUND(404, "COLLECTION-001" , "도감을 찾을 수 없습니다." ),
+
+    // 관람 기록
+    RECORD_NOT_FOUND(404, "RECORD-001" , "관람기록을 찾을 수 없습니다." ),
+    RECORD_ACCESS_DENIED(403, "RECORD-002" , "해당 관람기록에 대한 접근 권한이 없습니다." );
 
 
     private final int status;
