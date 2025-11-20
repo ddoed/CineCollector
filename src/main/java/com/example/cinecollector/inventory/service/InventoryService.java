@@ -8,6 +8,8 @@ import com.example.cinecollector.inventory.dto.*;
 import com.example.cinecollector.inventory.entity.Inventory;
 import com.example.cinecollector.inventory.entity.PerkStatus;
 import com.example.cinecollector.inventory.repository.InventoryRepository;
+import com.example.cinecollector.movie.entity.Movie;
+import com.example.cinecollector.movie.repository.MovieRepository;
 import com.example.cinecollector.perk.entity.Perk;
 import com.example.cinecollector.perk.repository.PerkRepository;
 import com.example.cinecollector.theater.entity.Theater;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,6 +34,7 @@ public class InventoryService {
     private final PerkRepository perkRepository;
     private final EventRepository eventRepository;
     private final CollectionRepository collectionRepository;
+    private final MovieRepository movieRepository;
 
     @Transactional
     public InventoryResponseDto createInventory(Long creatorId, InventoryCreateRequestDto dto) {
