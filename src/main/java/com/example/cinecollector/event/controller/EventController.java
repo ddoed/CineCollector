@@ -73,5 +73,36 @@ public class EventController {
         eventService.deleteEvent(userId, eventId);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
+
+    @GetMapping("/management/statistics")
+    public ResponseEntity<ApiResponse<EventManagementStatisticsDto>> getEventManagementStatistics(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        Long creatorId = userDetails.getUser().getUserId();
+        EventManagementStatisticsDto statistics = eventService.getEventManagementStatistics(creatorId);
+        return ResponseEntity.ok(ApiResponse.success(statistics));
+    }
+
+    @GetMapping("/management/list")
+    public ResponseEntity<ApiResponse<List<EventListDto>>> getEventManagementList(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam(required = false, defaultValue = "전체") String status,
+            @RequestParam(required = false) String movieTitle,
+            @RequestParam(required = false) String eventTitle
+    ) {
+        Long creatorId = userDetails.getUser().getUserId();
+        List<EventListDto> list = eventService.getEventManagementList(creatorId, status, movieTitle, eventTitle);
+        return ResponseEntity.ok(ApiResponse.success(list));
+    }
+
+    @PostMapping("/with-perk")
+    public ResponseEntity<ApiResponse<EventResponseDto>> createEventWithPerk(
+            @Valid @RequestBody EventWithPerkCreateRequestDto dto,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        Long userId = userDetails.getUser().getUserId();
+        EventResponseDto responseDto = eventService.createEventWithPerk(userId, dto);
+        return ResponseEntity.ok(ApiResponse.success(responseDto));
+    }
 }
 

@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -200,7 +201,7 @@ public class EventService {
                 .movie(EventListDto.MovieInfoDto.builder()
                         .movieId(movie.getMovieId())
                         .title(movie.getTitle())
-                        .image(null) // 스키마에 없음
+                        .image(movie.getImage())
                         .build())
                 .title(event.getTitle())
                 .status(eventStatus)
@@ -241,6 +242,88 @@ public class EventService {
             return "소진 완료";
         }
         return stock + "개 남음";
+    }
+
+    @Transactional(readOnly = true)
+    public EventManagementStatisticsDto getEventManagementStatistics(Long creatorId) {
+        Map<String, Object> stats = eventRepository.getEventManagementStatistics(creatorId);
+
+        Integer totalEvents = ((Number) stats.get("total_events")).intValue();
+        Integer ongoingEvents = ((Number) stats.get("ongoing_events")).intValue();
+        Integer totalPerkQuantity = ((Number) stats.get("total_perk_quantity")).intValue();
+
+        return EventManagementStatisticsDto.builder()
+                .totalEvents(totalEvents)
+                .ongoingEvents(ongoingEvents)
+                .totalPerkQuantity(totalPerkQuantity)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<EventListDto> getEventManagementList(Long creatorId, String status, String movieTitle, String eventTitle) {
+        List<Event> events = eventRepository.findAllByCreatorIdWithFilters(creatorId, status, movieTitle, eventTitle);
+
+        return events.stream()
+                .map(this::convertToEventListDto)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public EventResponseDto createEventWithPerk(Long userId, EventWithPerkCreateRequestDto dto) {
+        if (!movieRepository.existsById(dto.getMovieId())) {
+            throw new BusinessException(ErrorCode.MOVIE_NOT_FOUND);
+        }
+
+        // 이벤트 생성
+        Event event = Event.builder()
+                .movieId(dto.getMovieId())
+                .creatorId(userId)
+                .title(dto.getTitle())
+                .startDate(dto.getStartDate())
+                .endDate(dto.getEndDate())
+                .weekNo(dto.getWeekNo())
+                .image(dto.getEventImage())
+                .build();
+
+        Event savedEvent = eventRepository.save(event);
+
+        // 특전 생성
+        if (dto.getPerk() != null) {
+            Perk perk = Perk.builder()
+                    .eventId(savedEvent.getEventId())
+                    .name(dto.getPerk().getName())
+                    .type(dto.getPerk().getType())
+                    .limitPerUser(dto.getPerk().getLimitPerUser())
+                    .quantity(dto.getPerk().getTotalQuantity())
+                    .description(dto.getPerk().getDescription())
+                    .image(dto.getPerk().getPerkImage())
+                    .build();
+
+            Perk savedPerk = perkRepository.save(perk);
+
+            // 참여 극장 선택 (재고는 0으로 초기 설정)
+            if (dto.getTheaterIds() != null && !dto.getTheaterIds().isEmpty()) {
+                for (Long theaterId : dto.getTheaterIds()) {
+                    // 극장 존재 확인
+                    theaterRepository.findById(theaterId)
+                            .orElseThrow(() -> new BusinessException(ErrorCode.THEATER_NOT_FOUND));
+
+                    // 이미 등록된 지점인지 확인
+                    if (inventoryRepository.findById(theaterId, savedPerk.getPerkId()).isEmpty()) {
+                        Inventory inv = Inventory.builder()
+                                .theaterId(theaterId)
+                                .perkId(savedPerk.getPerkId())
+                                .stock(0)
+                                .status(PerkStatus.SOLD_OUT)
+                                .build();
+                        inventoryRepository.save(inv);
+                    }
+                }
+            }
+        }
+
+        return EventResponseDto.from(savedEvent);
     }
 }
 

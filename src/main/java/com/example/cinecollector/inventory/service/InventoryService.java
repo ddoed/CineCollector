@@ -265,5 +265,115 @@ public class InventoryService {
                 })
                 .collect(Collectors.toList());
     }
+
+    @Transactional(readOnly = true)
+    public TheaterStockDistributionDto getTheaterStockDistribution(Long creatorId, Long perkId) {
+        Perk perk = perkRepository.findById(perkId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PERK_NOT_FOUND));
+
+        Event event = eventRepository.findById(perk.getEventId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.EVENT_NOT_FOUND));
+
+        if (!event.getCreatorId().equals(creatorId)) {
+            throw new BusinessException(ErrorCode.PERK_ACCESS_DENIED);
+        }
+
+        Movie movie = movieRepository.findById(event.getMovieId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.MOVIE_NOT_FOUND));
+
+        // 모든 극장 목록 조회
+        List<Theater> allTheaters = theaterRepository.findAll();
+
+        // 해당 특전의 재고가 있는 극장들
+        List<Inventory> inventories = inventoryRepository.findAllByPerkId(perkId);
+        Map<Long, Inventory> inventoryMap = inventories.stream()
+                .collect(Collectors.toMap(Inventory::getTheaterId, inv -> inv));
+
+        List<TheaterStockDistributionDto.TheaterStockDto> theaterStocks = allTheaters.stream()
+                .map(theater -> {
+                    Inventory inventory = inventoryMap.get(theater.getTheaterId());
+                    Integer currentStock = inventory != null ? inventory.getStock() : 0;
+
+                    return TheaterStockDistributionDto.TheaterStockDto.builder()
+                            .theaterId(theater.getTheaterId())
+                            .name(theater.getName())
+                            .location(theater.getLocation())
+                            .currentStock(currentStock)
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        return TheaterStockDistributionDto.builder()
+                .perkId(perk.getPerkId())
+                .perkName(perk.getName())
+                .perkType(perk.getType())
+                .movie(TheaterStockDistributionDto.MovieInfoDto.builder()
+                        .movieId(movie.getMovieId())
+                        .title(movie.getTitle())
+                        .build())
+                .totalQuantity(perk.getQuantity())
+                .theaters(theaterStocks)
+                .build();
+    }
+
+    @Transactional
+    public void distributeStock(Long creatorId, Long perkId, StockDistributionRequestDto dto) {
+        Perk perk = perkRepository.findById(perkId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PERK_NOT_FOUND));
+
+        Event event = eventRepository.findById(perk.getEventId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.EVENT_NOT_FOUND));
+
+        if (!event.getCreatorId().equals(creatorId)) {
+            throw new BusinessException(ErrorCode.PERK_ACCESS_DENIED);
+        }
+
+        // 총 배포 수량 확인
+        int totalDistributed = dto.getTheaterStocks().stream()
+                .mapToInt(StockDistributionRequestDto.TheaterStockItemDto::getStock)
+                .sum();
+
+        if (perk.getQuantity() != null && totalDistributed > perk.getQuantity()) {
+            throw new BusinessException(ErrorCode.STOCK_INSUFFICIENT);
+        }
+
+        // 각 극장별 재고 업데이트 또는 생성
+        for (StockDistributionRequestDto.TheaterStockItemDto item : dto.getTheaterStocks()) {
+            Theater theater = theaterRepository.findById(item.getTheaterId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.THEATER_NOT_FOUND));
+
+            Optional<Inventory> existingInventory = inventoryRepository.findById(theater.getTheaterId(), perkId);
+
+            if (existingInventory.isPresent()) {
+                // 기존 재고 업데이트
+                Inventory updated = Inventory.builder()
+                        .theaterId(theater.getTheaterId())
+                        .perkId(perkId)
+                        .stock(item.getStock())
+                        .status(calculateNewStatus(item.getStock()))
+                        .build();
+                inventoryRepository.update(updated);
+            } else {
+                // 새 재고 생성
+                Inventory newInventory = Inventory.builder()
+                        .theaterId(theater.getTheaterId())
+                        .perkId(perkId)
+                        .stock(item.getStock())
+                        .status(calculateNewStatus(item.getStock()))
+                        .build();
+                inventoryRepository.save(newInventory);
+            }
+        }
+    }
+
+    private PerkStatus calculateNewStatus(int stock) {
+        if (stock <= 0) {
+            return PerkStatus.SOLD_OUT;
+        } else if (stock <= 10) {
+            return PerkStatus.LOW;
+        } else {
+            return PerkStatus.AVAILABLE;
+        }
+    }
 }
 

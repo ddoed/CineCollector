@@ -102,5 +102,26 @@ public class InventoryController {
         List<ApplicantListDto> applicants = inventoryService.getApplicantList(managerId, perkId);
         return ResponseEntity.ok(ApiResponse.success(applicants));
     }
+
+    @GetMapping("/{perkId}/distribution")
+    public ResponseEntity<ApiResponse<TheaterStockDistributionDto>> getTheaterStockDistribution(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long perkId
+    ) {
+        Long creatorId = userDetails.getUser().getUserId();
+        TheaterStockDistributionDto distribution = inventoryService.getTheaterStockDistribution(creatorId, perkId);
+        return ResponseEntity.ok(ApiResponse.success(distribution));
+    }
+
+    @PostMapping("/{perkId}/distribution")
+    public ResponseEntity<ApiResponse<Void>> distributeStock(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long perkId,
+            @Valid @RequestBody StockDistributionRequestDto dto
+    ) {
+        Long creatorId = userDetails.getUser().getUserId();
+        inventoryService.distributeStock(creatorId, perkId, dto);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
 }
 

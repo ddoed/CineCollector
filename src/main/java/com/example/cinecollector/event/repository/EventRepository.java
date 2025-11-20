@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -30,14 +31,14 @@ public class EventRepository {
 
     public Event save(Event e) {
         String sql = """
-            INSERT INTO events(movie_id, creator_id, title, start_date, end_date, week_no)
-            VALUES (?, ?, ?, ?, ?, ?)
-            RETURNING event_id, movie_id, creator_id, title, start_date, end_date, week_no
+            INSERT INTO events(movie_id, creator_id, title, start_date, end_date, week_no, image)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            RETURNING event_id, movie_id, creator_id, title, start_date, end_date, week_no, image
             """;
 
         return jdbcTemplate.queryForObject(sql, rowMapper,
                 e.getMovieId(), e.getCreatorId(), e.getTitle(),
-                e.getStartDate(), e.getEndDate(), e.getWeekNo()
+                e.getStartDate(), e.getEndDate(), e.getWeekNo(), e.getImage()
         );
     }
 
@@ -120,6 +121,73 @@ public class EventRepository {
         }
 
         return jdbcTemplate.query(sql.toString(), rowMapper);
+    }
+
+    public List<Event> findAllByCreatorId(Long creatorId) {
+        String sql = "SELECT * FROM events WHERE creator_id = ? ORDER BY event_id DESC";
+        return jdbcTemplate.query(sql, rowMapper, creatorId);
+    }
+
+    public List<Event> findAllByCreatorIdWithFilters(Long creatorId, String status, String movieTitle, String eventTitle) {
+        StringBuilder sql = new StringBuilder("""
+            SELECT e.*
+            FROM events e
+            JOIN movies m ON e.movie_id = m.movie_id
+            WHERE e.creator_id = ?
+        """);
+
+        if (status != null && !status.isEmpty() && !status.equals("전체")) {
+            switch (status) {
+                case "진행 중" -> sql.append(" AND e.start_date <= ? AND e.end_date >= ?");
+                case "예정" -> sql.append(" AND e.start_date > ?");
+                case "종료" -> sql.append(" AND e.end_date < ?");
+            }
+        }
+
+        if (movieTitle != null && !movieTitle.trim().isEmpty()) {
+            sql.append(" AND m.title ILIKE ?");
+        }
+
+        if (eventTitle != null && !eventTitle.trim().isEmpty()) {
+            sql.append(" AND e.title ILIKE ?");
+        }
+
+        sql.append(" ORDER BY e.start_date DESC, e.event_id DESC");
+
+        List<Object> params = new java.util.ArrayList<>();
+        params.add(creatorId);
+
+        if (status != null && !status.isEmpty() && !status.equals("전체")) {
+            LocalDate today = LocalDate.now();
+            params.add(today);
+            if (status.equals("진행 중")) {
+                params.add(today);
+            }
+        }
+
+        if (movieTitle != null && !movieTitle.trim().isEmpty()) {
+            params.add("%" + movieTitle + "%");
+        }
+
+        if (eventTitle != null && !eventTitle.trim().isEmpty()) {
+            params.add("%" + eventTitle + "%");
+        }
+
+        return jdbcTemplate.query(sql.toString(), rowMapper, params.toArray());
+    }
+
+    public Map<String, Object> getEventManagementStatistics(Long creatorId) {
+        String sql = """
+            SELECT 
+                COUNT(*) AS total_events,
+                COUNT(CASE WHEN e.start_date <= CURRENT_DATE AND e.end_date >= CURRENT_DATE THEN 1 END) AS ongoing_events,
+                COALESCE(SUM(p.quantity), 0) AS total_perk_quantity
+            FROM events e
+            LEFT JOIN perks p ON p.event_id = e.event_id
+            WHERE e.creator_id = ?
+        """;
+
+        return jdbcTemplate.queryForMap(sql, creatorId);
     }
 }
 

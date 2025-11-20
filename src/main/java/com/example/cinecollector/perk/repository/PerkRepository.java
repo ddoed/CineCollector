@@ -29,9 +29,9 @@ public class PerkRepository {
 
     public Perk save(Perk perk) {
         String sql = """
-            INSERT INTO perks(event_id, name, type, limit_per_user, quantity, description)
-            VALUES (?, ?, ?, ?, ?, ?)
-            RETURNING perk_id, event_id, name, type, limit_per_user, quantity, description
+            INSERT INTO perks(event_id, name, type, limit_per_user, quantity, description, image)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            RETURNING perk_id, event_id, name, type, limit_per_user, quantity, description, image
         """;
 
         return jdbcTemplate.queryForObject(sql, rowMapper,
@@ -40,7 +40,8 @@ public class PerkRepository {
                 perk.getType(),
                 perk.getLimitPerUser(),
                 perk.getQuantity(),
-                perk.getDescription()
+                perk.getDescription(),
+                perk.getImage()
         );
     }
 
