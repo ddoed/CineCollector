@@ -1,7 +1,7 @@
 -- User
 -- ROLE COLLECTOR
 INSERT INTO users (name, email, password, role, profile_image, created_at)
-VALUES ('collector1', 'collector1@example.com', '$10$9ifD7PqDmF6Ty9pHxgDr2uU0/gE0/qusyuwBnoEOVFDotH4G.zDxS', 'COLLECTOR', NULL, CURRENT_TIMESTAMP);
+VALUES ('collector1', 'collector1@example.com', '$2a$10$.2SNxhkEFlwzmKn7BspF/uR3MVM93DkWjBTVMAtpiaZJATWuECXQ6', 'COLLECTOR', NULL, CURRENT_TIMESTAMP);
 INSERT INTO users (name, email, password, role, profile_image, created_at)
 VALUES ('collector2', 'collector2@example.com', '$2a$10$fC7C3y/l6lbWfWUegnd02.8L4Lcu2EJ0m4/B2IQMIaxN3qOcHjxuu', 'COLLECTOR', NULL, CURRENT_TIMESTAMP);
 INSERT INTO users (name, email, password, role, profile_image, created_at)
@@ -9,11 +9,11 @@ VALUES ('collector3', 'collector3@example.com', '$2a$10$8pnd066IGjV9JEWxpH2OHOKq
 
 -- ROLE THEATER
 INSERT INTO users (name, email, password, role, profile_image, created_at)
-VALUES ('theator1', 'theator1@example.com', '$2a$10$7oXu/s0X5XssU8vfJrOZy.BFJWuKzyaFJiodAjwGsb5p6PQOuyHiW', 'THEATOR', NULL, CURRENT_TIMESTAMP);
+VALUES ('theater1', 'theater1@example.com', '$2a$10$7oXu/s0X5XssU8vfJrOZy.BFJWuKzyaFJiodAjwGsb5p6PQOuyHiW', 'THEATER', NULL, CURRENT_TIMESTAMP);
 INSERT INTO users (name, email, password, role, profile_image, created_at)
-VALUES ('theator2', 'theator2@example.com', '$2a$10$jEcexuyQBFsrO3F4e/WjyeyViTUCIx2BaUEo7ZI3JJlUBQsHhh5W6', 'THEATOR', NULL, CURRENT_TIMESTAMP);
+VALUES ('theater2', 'theater2@example.com', '$2a$10$jEcexuyQBFsrO3F4e/WjyeyViTUCIx2BaUEo7ZI3JJlUBQsHhh5W6', 'THEATER', NULL, CURRENT_TIMESTAMP);
 INSERT INTO users (name, email, password, role, profile_image, created_at)
-VALUES ('theator3', 'theator3@example.com', '$2a$10$eMReVVxk.PBtKkZ/NmqA7unItB8Lw3QlO3M5jcbz3YbHtiNQnttm.', 'THEATOR', NULL, CURRENT_TIMESTAMP);
+VALUES ('theater3', 'theater3@example.com', '$2a$10$eMReVVxk.PBtKkZ/NmqA7unItB8Lw3QlO3M5jcbz3YbHtiNQnttm.', 'THEATE6b7nm9.R', NULL, CURRENT_TIMESTAMP);
 
 -- ROLE CREATOR
 INSERT INTO users (name, email, password, role, profile_image, created_at)
@@ -74,9 +74,9 @@ VALUES (6,'푸르른 봄 포스터','포스터',NULL,2000,'<극장판 주술회�
 
 -- Theaters 예시 데이터 (manager_id는 users의 user_id 참조)
 -- 8번 출구 증정 지점
-INSERT INTO theaters (name, location, manager_id) VALUES ('메가박스 세종나성', '세종특별자치시 나성로 38', NULL);
+INSERT INTO theaters (name, location, manager_id) VALUES ('메가박스 세종나성', '세종특별자치시 나성로 38', 4);
 INSERT INTO theaters (name, location, manager_id) VALUES ('메가박스 송도(트리플스트리트)', '인천광역시 연수구 D동 송도과학로16번길 33-4 2~4층 트리플스트리트', NULL);
-INSERT INTO theaters (name, location, manager_id) VALUES ('메가박스 홍대', '서울특별시 마포구 양화로 147 아일렉스 7층', NULL);
+INSERT INTO theaters (name, location, manager_id) VALUES ('메가박스 홍대', '서울특별시 마포구 양화로 147 아일렉스 7층', 5);
 INSERT INTO theaters (name, location, manager_id) VALUES ('메가박스 대전중앙로', '대전광역시 중구 중앙로 126', NULL);
 INSERT INTO theaters (name, location, manager_id) VALUES ('메가박스 수원AK플라자(수원역)', '경기도 수원시 팔달구 덕영대로 924', NULL);
 INSERT INTO theaters (name, location, manager_id) VALUES ('메가박스 고양스타필드', '세종특별자치시 나성로 38', NULL);
@@ -85,7 +85,7 @@ INSERT INTO theaters (name, location, manager_id) VALUES ('메가박스 더부�
 INSERT INTO theaters (name, location, manager_id) VALUES ('메가박스 마곡', '대전광역시 중구 중앙로 126', NULL);
 INSERT INTO theaters (name, location, manager_id) VALUES ('메가박스 센트럴', '서울특별시 서초구 신반포로 176', NULL);
 INSERT INTO theaters (name, location, manager_id) VALUES ('메가박스 수원인계', '경기도 수원시 팔달구 효원로 278 4 6층', NULL);
-INSERT INTO theaters (name, location, manager_id) VALUES ('메가박스 하남스타필드', '경기도 하남시 미사대로 750', NULL);
+INSERT INTO theaters (name, location, manager_id) VALUES ('메가박스 하남스타필드', '경기도 하남시 미사대로 750', 6);
 INSERT INTO theaters (name, location, manager_id) VALUES ('CGV 강남', '서울 서초구 강남대로 438 스타플렉스', NULL);
 INSERT INTO theaters (name, location, manager_id) VALUES ('CGV 거제', '경남 거제시 장승포로 14', NULL);
 INSERT INTO theaters (name, location, manager_id) VALUES ('CGV 건대입구', '서울 광진구 아차산로 262', NULL);
