@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS theaters (
     theater_id BIGSERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     location VARCHAR(100),
-    manager_id BIGINT NOT NULL,
+    manager_id BIGINT,
 
     CONSTRAINT fk_theater_user
     FOREIGN KEY (manager_id) REFERENCES users(user_id)
