@@ -95,5 +95,26 @@ public class ViewingRecordRepository {
 
         return jdbcTemplate.query(sql, rowMapper);
     }
+
+    public List<ViewingRecord> findAllByUserIdWithSearch(Long userId, String movieTitle) {
+        if (movieTitle != null && !movieTitle.trim().isEmpty()) {
+            String sql = """
+                SELECT vr.*
+                FROM viewing_records vr
+                JOIN movies m ON vr.movie_id = m.movie_id
+                WHERE vr.user_id = ? AND m.title ILIKE ?
+                ORDER BY vr.created_at DESC
+            """;
+            return jdbcTemplate.query(sql, rowMapper, userId, "%" + movieTitle + "%");
+        }
+
+        String sql = """
+            SELECT *
+            FROM viewing_records
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+        """;
+        return jdbcTemplate.query(sql, rowMapper, userId);
+    }
 }
 

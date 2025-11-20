@@ -63,5 +63,24 @@ public class ViewingRecordController {
         List<HomeViewingRecordDto> list = viewingRecordService.getHomeRecords();
         return ResponseEntity.ok(ApiResponse.success(list));
     }
+
+    @GetMapping("/statistics")
+    public ResponseEntity<ApiResponse<ViewingRecordStatisticsDto>> getStatistics(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        Long userId = userDetails.getUser().getUserId();
+        ViewingRecordStatisticsDto statistics = viewingRecordService.getViewingRecordStatistics(userId);
+        return ResponseEntity.ok(ApiResponse.success(statistics));
+    }
+
+    @GetMapping("/my")
+    public ResponseEntity<ApiResponse<List<HomeViewingRecordDto>>> getMyViewingRecords(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam(required = false) String movieTitle
+    ) {
+        Long userId = userDetails.getUser().getUserId();
+        List<HomeViewingRecordDto> list = viewingRecordService.getMyViewingRecords(userId, movieTitle);
+        return ResponseEntity.ok(ApiResponse.success(list));
+    }
 }
 

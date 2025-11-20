@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -194,13 +195,13 @@ public class ViewingRecordService {
                 .user(HomeViewingRecordDto.UserInfoDto.builder()
                         .userId(user.getUserId())
                         .name(user.getName())
-                        .profileImage(null) // 스키마에 프로필 이미지 필드가 없음
+                        .profileImage(user.getProfileImage())
                         .build())
                 .timeAgo(timeAgo)
                 .movie(HomeViewingRecordDto.MovieInfoDto.builder()
                         .movieId(movie.getMovieId())
                         .title(movie.getTitle())
-                        .movieImage(null) // 스키마에 영화 이미지 필드가 없음
+                        .movieImage(movie.getImage())
                         .build())
                 .rating(record.getRating())
                 .viewDate(record.getViewDate())
@@ -209,6 +210,50 @@ public class ViewingRecordService {
                 .images(images)
                 .perks(perks)
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public ViewingRecordStatisticsDto getViewingRecordStatistics(Long userId) {
+        List<ViewingRecord> allRecords = viewingRecordRepository.findAllByUserId(userId);
+
+        // 총 관람 편수
+        int totalCount = allRecords.size();
+
+        // 이번 달 관람 편수
+        LocalDate now = LocalDate.now();
+        LocalDate firstDayOfMonth = now.withDayOfMonth(1);
+        int thisMonthCount = (int) allRecords.stream()
+                .filter(record -> record.getViewDate() != null && 
+                        !record.getViewDate().isBefore(firstDayOfMonth))
+                .count();
+
+        // 평균 평점
+        double averageRating = 0.0;
+        List<Float> ratings = allRecords.stream()
+                .map(ViewingRecord::getRating)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        
+        if (!ratings.isEmpty()) {
+            double sum = ratings.stream().mapToDouble(Float::doubleValue).sum();
+            averageRating = sum / ratings.size();
+            averageRating = Math.round(averageRating * 10.0) / 10.0;
+        }
+
+        return ViewingRecordStatisticsDto.builder()
+                .totalCount(totalCount)
+                .thisMonthCount(thisMonthCount)
+                .averageRating(averageRating)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<HomeViewingRecordDto> getMyViewingRecords(Long userId, String movieTitle) {
+        List<ViewingRecord> records = viewingRecordRepository.findAllByUserIdWithSearch(userId, movieTitle);
+
+        return records.stream()
+                .map(this::convertToHomeDto)
+                .collect(Collectors.toList());
     }
 
     private String calculateTimeAgo(Timestamp createdAt) {

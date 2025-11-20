@@ -14,7 +14,9 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    role VARCHAR(50) NOT NULL
+    role VARCHAR(50) NOT NULL,
+    profile_image VARCHAR(500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS movies (
@@ -22,7 +24,8 @@ CREATE TABLE IF NOT EXISTS movies (
     title VARCHAR(100) NOT NULL,
     release_date DATE,
     genre VARCHAR(50),
-    duration INT
+    duration INT,
+    image VARCHAR(500)
 );
 
 CREATE TABLE IF NOT EXISTS events (
@@ -33,6 +36,7 @@ CREATE TABLE IF NOT EXISTS events (
     start_date  DATE,
     end_date    DATE,
     week_no     INT,
+    image       VARCHAR(500),
 
     CONSTRAINT fk_event_movie
     FOREIGN KEY (movie_id) REFERENCES movies(movie_id)
@@ -51,6 +55,7 @@ CREATE TABLE IF NOT EXISTS perks (
     limit_per_user  INT,
     quantity        INT,
     description     VARCHAR(255),
+    image           VARCHAR(500),
 
     CONSTRAINT fk_perk_event
     FOREIGN KEY (event_id) REFERENCES events(event_id)

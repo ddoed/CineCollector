@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.sql.Timestamp;
+
 @Getter
 @AllArgsConstructor
 @NoArgsConstructor
@@ -15,5 +17,7 @@ public class User {
     private String email;
     private String password;
     private Role role;
+    private String profileImage;
+    private Timestamp createdAt;
 }
 

@@ -5,6 +5,7 @@ import com.example.cinecollector.common.exception.ErrorCode;
 import com.example.cinecollector.common.jwt.dto.TokenDto;
 import com.example.cinecollector.common.jwt.service.JwtService;
 import com.example.cinecollector.user.dto.UserResponseDto;
+import com.example.cinecollector.user.dto.UserUpdateRequestDto;
 import com.example.cinecollector.user.entity.Role;
 import com.example.cinecollector.user.entity.User;
 import com.example.cinecollector.user.repository.UserRepository;
@@ -58,11 +59,26 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        return UserResponseDto.builder()
-                .name(user.getName())
+        return UserResponseDto.from(user);
+    }
+
+    @Transactional
+    public UserResponseDto updateProfile(Long userId, UserUpdateRequestDto dto) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        User updated = User.builder()
+                .userId(user.getUserId())
+                .name(dto.getName() != null ? dto.getName() : user.getName())
                 .email(user.getEmail())
+                .password(user.getPassword())
                 .role(user.getRole())
+                .profileImage(dto.getProfileImage() != null ? dto.getProfileImage() : user.getProfileImage())
+                .createdAt(user.getCreatedAt())
                 .build();
+
+        User saved = userRepository.update(updated);
+        return UserResponseDto.from(saved);
     }
 }
 

@@ -6,6 +6,7 @@ import com.example.cinecollector.common.security.CustomUserDetails;
 import com.example.cinecollector.user.dto.LoginRequestDto;
 import com.example.cinecollector.user.dto.UserCreateRequestDto;
 import com.example.cinecollector.user.dto.UserResponseDto;
+import com.example.cinecollector.user.dto.UserUpdateRequestDto;
 import com.example.cinecollector.user.entity.User;
 import com.example.cinecollector.user.service.UserService;
 import jakarta.validation.Valid;
@@ -44,5 +45,15 @@ public class UserController {
         User user = userDetails.getUser();
         UserResponseDto userResponseDto = userService.getUserInfo(user.getUserId());
         return ResponseEntity.ok(ApiResponse.success(userResponseDto));
+    }
+
+    @PatchMapping("/me")
+    public ResponseEntity<ApiResponse<UserResponseDto>> updateProfile(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody UserUpdateRequestDto dto
+    ) {
+        Long userId = userDetails.getUser().getUserId();
+        UserResponseDto response = userService.updateProfile(userId, dto);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

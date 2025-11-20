@@ -23,6 +23,8 @@ public class UserRepository {
                     .email(rs.getString("email"))
                     .password(rs.getString("password"))
                     .role(Role.valueOf(rs.getString("role")))
+                    .profileImage(rs.getString("profile_image"))
+                    .createdAt(rs.getTimestamp("created_at"))
                     .build();
 
     public Optional<User> findByEmail(String email) {
@@ -33,16 +35,17 @@ public class UserRepository {
 
     public User save(User user) {
         String sql = """
-                INSERT INTO users(name, email, password, role)
-                VALUES (?, ?, ?, ?)
-                RETURNING user_id, name, email, password, role
+                INSERT INTO users(name, email, password, role, profile_image)
+                VALUES (?, ?, ?, ?, ?)
+                RETURNING user_id, name, email, password, role, profile_image, created_at
                 """;
 
         return jdbcTemplate.queryForObject(sql, rowMapper,
                 user.getName(),
                 user.getEmail(),
                 user.getPassword(),
-                user.getRole().name()
+                user.getRole().name(),
+                user.getProfileImage()
         );
     }
 
@@ -50,6 +53,21 @@ public class UserRepository {
         String sql = "SELECT * FROM users WHERE user_id = ?";
         List<User> users = jdbcTemplate.query(sql, rowMapper, id);
         return users.stream().findFirst();
+    }
+
+    public User update(User user) {
+        String sql = """
+            UPDATE users
+            SET name = ?, profile_image = ?
+            WHERE user_id = ?
+            RETURNING *
+        """;
+
+        return jdbcTemplate.queryForObject(sql, rowMapper,
+                user.getName(),
+                user.getProfileImage(),
+                user.getUserId()
+        );
     }
 }
 
