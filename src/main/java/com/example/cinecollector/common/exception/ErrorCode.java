@@ -33,6 +33,8 @@ public enum ErrorCode {
     // 특전
     PERK_NOT_FOUND(404, "PERK-001" , "특전을 찾을 수 없습니다." ),
     PERK_ACCESS_DENIED(403, "PERK-002" , "해당 특전에 대한 접근 권한이 없습니다." ),
+    STOCK_INSUFFICIENT(400, "PERK-003" , "재고가 부족합니다." ),
+    LIMIT_EXCEEDED(400, "PERK-004" , "1인당 제한 수량을 초과했습니다." ),
 
     // 극장
     THEATER_NOT_FOUND(404, "THEATER-001", "극장을 찾을 수 없습니다." ),
