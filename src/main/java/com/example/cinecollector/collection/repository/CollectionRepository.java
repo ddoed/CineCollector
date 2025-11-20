@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 import com.example.cinecollector.collection.entity.Collection;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -75,6 +76,34 @@ public class CollectionRepository {
         """;
 
         return jdbcTemplate.query(sql, rowMapper, userId);
+    }
+
+    public List<Collection> findAllByPerkId(Long perkId) {
+        String sql = """
+            SELECT *
+            FROM collections
+            WHERE perk_id = ?
+            ORDER BY obtained_date DESC NULLS LAST
+        """;
+
+        return jdbcTemplate.query(sql, rowMapper, perkId);
+    }
+
+    public List<Map<String, Object>> findApplicantsByPerkId(Long perkId) {
+        String sql = """
+            SELECT 
+                c.user_id,
+                c.obtained_date,
+                c.quantity,
+                u.name,
+                u.email
+            FROM collections c
+            JOIN users u ON c.user_id = u.user_id
+            WHERE c.perk_id = ?
+            ORDER BY c.obtained_date DESC NULLS LAST, c.user_id
+        """;
+
+        return jdbcTemplate.queryForList(sql, perkId);
     }
 }
 

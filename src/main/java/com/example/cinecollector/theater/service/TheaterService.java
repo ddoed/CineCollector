@@ -80,4 +80,10 @@ public class TheaterService {
 
         theaterRepository.delete(theaterId);
     }
+
+    public TheaterResponseDto getTheaterByManagerId(Long managerId) {
+        Theater theater = theaterRepository.findByManagerId(managerId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.THEATER_NOT_FOUND));
+        return TheaterResponseDto.from(theater);
+    }
 }

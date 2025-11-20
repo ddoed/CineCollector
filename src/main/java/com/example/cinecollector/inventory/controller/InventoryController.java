@@ -2,16 +2,15 @@ package com.example.cinecollector.inventory.controller;
 
 import com.example.cinecollector.common.response.ApiResponse;
 import com.example.cinecollector.common.security.CustomUserDetails;
-import com.example.cinecollector.inventory.dto.InventoryCreateRequestDto;
-import com.example.cinecollector.inventory.dto.InventoryResponseDto;
-import com.example.cinecollector.inventory.dto.InventoryUpdateRequestDto;
-import com.example.cinecollector.inventory.dto.TheaterSelectionDto;
+import com.example.cinecollector.inventory.dto.*;
 import com.example.cinecollector.inventory.service.InventoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -72,6 +71,36 @@ public class InventoryController {
                 userId, perkId, theaterId, dto.getStock(), dto.getStatus()
         );
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/statistics")
+    public ResponseEntity<ApiResponse<TheaterInventoryStatisticsDto>> getInventoryStatistics(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        Long managerId = userDetails.getUser().getUserId();
+        TheaterInventoryStatisticsDto statistics = inventoryService.getInventoryStatistics(managerId);
+        return ResponseEntity.ok(ApiResponse.success(statistics));
+    }
+
+    @GetMapping("/list")
+    public ResponseEntity<ApiResponse<List<TheaterInventoryListDto>>> getInventoryList(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam(required = false) String movieTitle,
+            @RequestParam(required = false) String perkName
+    ) {
+        Long managerId = userDetails.getUser().getUserId();
+        List<TheaterInventoryListDto> list = inventoryService.getInventoryList(managerId, movieTitle, perkName);
+        return ResponseEntity.ok(ApiResponse.success(list));
+    }
+
+    @GetMapping("/{perkId}/applicants")
+    public ResponseEntity<ApiResponse<List<ApplicantListDto>>> getApplicantList(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long perkId
+    ) {
+        Long managerId = userDetails.getUser().getUserId();
+        List<ApplicantListDto> applicants = inventoryService.getApplicantList(managerId, perkId);
+        return ResponseEntity.ok(ApiResponse.success(applicants));
     }
 }
 

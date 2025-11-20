@@ -61,4 +61,13 @@ public class TheaterController {
         theaterService.deleteTheater(user.getUser().getUserId(), theaterId);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
+
+    @GetMapping("/my")
+    public ResponseEntity<ApiResponse<TheaterResponseDto>> getMyTheater(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        Long userId = userDetails.getUser().getUserId();
+        TheaterResponseDto responseDto = theaterService.getTheaterByManagerId(userId);
+        return ResponseEntity.ok(ApiResponse.success(responseDto));
+    }
 }
