@@ -68,7 +68,9 @@ export default function App() {
       return;
     }
     const allowedViews = filteredNav.map((item) => item.view);
-    if (!allowedViews.includes(currentView) && allowedViews.length > 0) {
+    // watchHistory는 프로필에서 접근 가능한 서브 뷰이므로 허용
+    const alwaysAllowedViews = ['watchHistory'];
+    if (!allowedViews.includes(currentView) && !alwaysAllowedViews.includes(currentView) && allowedViews.length > 0) {
       setCurrentView(allowedViews[0]);
     }
   }, [filteredNav, currentView, isLoggedIn]);

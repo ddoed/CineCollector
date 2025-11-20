@@ -46,6 +46,7 @@ interface Event {
   start_date: string;
   end_date: string;
   status: string;
+  image?: string | null;
   perks: Perk[];
   theater_count?: number;
   theaters?: Theater[];
@@ -410,6 +411,19 @@ export function EventsPerks() {
                     </div>
                     <div className="text-sm text-gray-400">
                       총 {eventDetail.perks[0].theaters?.length || 0}개 지점에서 특전을 받을 수 있습니다
+                    </div>
+                  </div>
+                )}
+
+                {/* Event Image */}
+                {eventDetail.image && (
+                  <div className="p-6 border-t border-red-900/30">
+                    <div className="max-w-md mx-auto">
+                      <ImageWithFallback
+                        src={eventDetail.image}
+                        alt={eventDetail.title || '이벤트 이미지'}
+                        className="w-full h-auto rounded-lg border border-red-900/30"
+                      />
                     </div>
                   </div>
                 )}

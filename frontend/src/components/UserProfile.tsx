@@ -5,8 +5,11 @@ import { Button } from './ui/button';
 import { Avatar } from './ui/avatar';
 import { Separator } from './ui/separator';
 import { ImageWithFallback } from './figma/ImageWithFallback';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from './ui/dialog';
+import { Label } from './ui/label';
+import { Input } from './ui/input';
 import { useAuth } from '../hooks/useAuth';
-import { viewingRecordsApi } from '../lib/api';
+import { viewingRecordsApi, usersApi } from '../lib/api';
 import { useEffect, useState } from 'react';
 
 interface UserProfileProps {
@@ -16,9 +19,12 @@ interface UserProfileProps {
 const posterFallback = 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=400&q=80';
 
 export function UserProfile({ onNavigateToWatchHistory }: UserProfileProps) {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [recentMovies, setRecentMovies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editProfileImage, setEditProfileImage] = useState('');
 
   useEffect(() => {
     const fetchRecentRecords = async () => {
@@ -36,6 +42,27 @@ export function UserProfile({ onNavigateToWatchHistory }: UserProfileProps) {
       fetchRecentRecords();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      setEditName(user.name || '');
+      setEditProfileImage(user.profile_image || '');
+    }
+  }, [user]);
+
+  const handleUpdateProfile = async () => {
+    try {
+      await usersApi.updateProfile({
+        name: editName,
+        profile_image: editProfileImage || undefined,
+      });
+      await refreshUser();
+      setIsEditDialogOpen(false);
+      alert('프로필이 수정되었습니다.');
+    } catch (err) {
+      alert((err as Error)?.message || '프로필 수정에 실패했습니다.');
+    }
+  };
 
 
   return (
@@ -81,10 +108,59 @@ export function UserProfile({ onNavigateToWatchHistory }: UserProfileProps) {
                 <Separator className="bg-red-900/50 mb-6" />
 
                 {/* Action Buttons */}
-                <Button className="w-full bg-red-600 hover:bg-red-700 text-white">
-                  <Edit className="w-4 h-4 mr-2" />
-                  프로필 수정
-                </Button>
+                <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="w-full bg-red-600 hover:bg-red-700 text-white">
+                      <Edit className="w-4 h-4 mr-2" />
+                      프로필 수정
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-black border-2 border-red-600/50 text-white">
+                    <DialogHeader>
+                      <DialogTitle className="text-xl">프로필 수정</DialogTitle>
+                      <DialogDescription className="text-gray-400">
+                        프로필 정보를 수정할 수 있습니다.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 mt-4">
+                      <div>
+                        <Label htmlFor="edit-name" className="text-gray-300">이름</Label>
+                        <Input 
+                          id="edit-name"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          placeholder="이름을 입력하세요"
+                          className="bg-gray-900 border-red-900/50 text-white mt-2"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-profile-image" className="text-gray-300">프로필 이미지 URL</Label>
+                        <Input 
+                          id="edit-profile-image"
+                          value={editProfileImage}
+                          onChange={(e) => setEditProfileImage(e.target.value)}
+                          placeholder="https://..."
+                          className="bg-gray-900 border-red-900/50 text-white mt-2"
+                        />
+                      </div>
+                      <div className="flex gap-2 pt-4">
+                        <Button 
+                          className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                          onClick={handleUpdateProfile}
+                        >
+                          수정 완료
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          className="flex-1 border-red-900/50 text-gray-400 hover:text-white"
+                          onClick={() => setIsEditDialogOpen(false)}
+                        >
+                          취소
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </Card>
             </motion.div>
           </div>

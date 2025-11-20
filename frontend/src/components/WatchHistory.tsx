@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Calendar, Film, Search, Star, Plus, MapPin, Trophy, MoreHorizontal, Edit, Trash, Lock, Globe } from 'lucide-react';
 import { Card } from './ui/card';
@@ -11,7 +11,7 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Avatar } from './ui/avatar';
 import { Switch } from './ui/switch';
-import { viewingRecordsApi, moviesApi } from '../lib/api';
+import { viewingRecordsApi, moviesApi, theatersApi } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 
 const posterFallback = 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=400&q=80';
@@ -26,6 +26,15 @@ export function WatchHistory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allMovies, setAllMovies] = useState<any[]>([]);
+  const [allTheaters, setAllTheaters] = useState<any[]>([]);
+  const [formData, setFormData] = useState({
+    movieId: '',
+    viewingDate: '',
+    theaterId: '',
+    rating: 0,
+    review: '',
+  });
+  const [selectedRating, setSelectedRating] = useState(0);
 
   useEffect(() => {
     const fetchRecords = async () => {
@@ -46,16 +55,56 @@ export function WatchHistory() {
   }, [user, searchQuery]);
 
   useEffect(() => {
-    const fetchMovies = async () => {
+    const fetchData = async () => {
       try {
-        const data = await moviesApi.getAll();
-        setAllMovies(data);
+        const [moviesData, theatersData] = await Promise.all([
+          moviesApi.getAll(),
+          theatersApi.getAll(),
+        ]);
+        setAllMovies(moviesData);
+        setAllTheaters(theatersData);
       } catch (err) {
-        console.error('영화 목록을 불러오지 못했습니다:', err);
+        console.error('데이터를 불러오지 못했습니다:', err);
       }
     };
-    fetchMovies();
+    fetchData();
   }, []);
+
+  const handleCreateRecord = async () => {
+    if (!formData.movieId || !formData.viewingDate) {
+      alert('영화와 관람일을 입력해주세요.');
+      return;
+    }
+    if (!formData.theaterId) {
+      alert('극장을 선택해주세요.');
+      return;
+    }
+    try {
+      await viewingRecordsApi.create({
+        movie_id: Number(formData.movieId),
+        view_date: formData.viewingDate,
+        theater_id: Number(formData.theaterId),
+        rating: selectedRating > 0 ? selectedRating : undefined,
+        review: formData.review || undefined,
+        is_public: isPublic,
+      });
+      setIsDialogOpen(false);
+      setFormData({
+        movieId: '',
+        viewingDate: '',
+        theaterId: '',
+        rating: 0,
+        review: '',
+      });
+      setSelectedRating(0);
+      // 목록 새로고침
+      const records = await viewingRecordsApi.getMyViewingRecords();
+      setMovies(records);
+      alert('관람 기록이 추가되었습니다.');
+    } catch (err) {
+      alert((err as Error)?.message || '관람 기록 추가에 실패했습니다.');
+    }
+  };
 
   const mockMovies: any[] = [
     { 
@@ -175,12 +224,21 @@ export function WatchHistory() {
                 </DialogHeader>
                 <div className="space-y-4 mt-4">
                   <div>
-                    <Label htmlFor="movie-title" className="text-gray-300">영화 제목</Label>
-                    <Input 
-                      id="movie-title" 
-                      placeholder="영화 제목을 입력하세요"
-                      className="bg-gray-900 border-red-900/50 text-white mt-2"
-                    />
+                    <Label htmlFor="movie-title" className="text-gray-300">영화 선택</Label>
+                    <select
+                      id="movie-title"
+                      value={formData.movieId}
+                      onChange={(e) => setFormData({ ...formData, movieId: e.target.value })}
+                      className="w-full bg-gray-900 border border-red-900/50 text-white rounded-md px-3 py-2 mt-2"
+                      required
+                    >
+                      <option value="">영화를 선택하세요</option>
+                      {allMovies.map(movie => (
+                        <option key={movie.movie_id} value={movie.movie_id}>
+                          {movie.title}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -188,52 +246,54 @@ export function WatchHistory() {
                       <Input 
                         id="watch-date" 
                         type="date"
+                        value={formData.viewingDate}
+                        onChange={(e) => setFormData({ ...formData, viewingDate: e.target.value })}
                         className="bg-gray-900 border-red-900/50 text-white mt-2"
+                        required
                       />
                     </div>
                     <div>
                       <Label htmlFor="theater" className="text-gray-300">극장</Label>
-                      <Input 
-                        id="theater" 
-                        placeholder="극장 이름"
-                        className="bg-gray-900 border-red-900/50 text-white mt-2"
-                      />
+                      <select
+                        id="theater"
+                        value={formData.theaterId}
+                        onChange={(e) => setFormData({ ...formData, theaterId: e.target.value })}
+                        className="w-full bg-gray-900 border border-red-900/50 text-white rounded-md px-3 py-2 mt-2"
+                        required
+                      >
+                        <option value="">극장을 선택하세요</option>
+                        {allTheaters.map(theater => (
+                          <option key={theater.theater_id} value={theater.theater_id}>
+                            {theater.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="genre" className="text-gray-300">장르</Label>
-                      <Input 
-                        id="genre" 
-                        placeholder="예: SF, 드라마"
-                        className="bg-gray-900 border-red-900/50 text-white mt-2"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-gray-300">별점</Label>
-                      <div className="flex items-center gap-1 mt-2">
-                        {[1, 2, 3, 4, 5].map((rating) => (
-                          <Star 
-                            key={rating}
-                            className="w-8 h-8 cursor-pointer text-gray-600 hover:text-red-600 transition-colors"
-                          />
-                        ))}
-                      </div>
+                  <div>
+                    <Label className="text-gray-300">별점</Label>
+                    <div className="flex items-center gap-1 mt-2">
+                      {[1, 2, 3, 4, 5].map((rating) => (
+                        <Star 
+                          key={rating}
+                          onClick={() => setSelectedRating(rating)}
+                          className={`w-8 h-8 cursor-pointer transition-colors ${
+                            rating <= selectedRating
+                              ? 'text-red-600 fill-red-600'
+                              : 'text-gray-600 hover:text-red-600'
+                          }`}
+                        />
+                      ))}
                     </div>
                   </div>
                   <div>
                     <Label htmlFor="review" className="text-gray-300">관람 후기</Label>
                     <Textarea 
                       id="review" 
+                      value={formData.review}
+                      onChange={(e) => setFormData({ ...formData, review: e.target.value })}
                       placeholder="영화에 대한 감상을 작성해주세요..."
                       className="bg-gray-900 border-red-900/50 text-white mt-2 min-h-[120px]"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-gray-300">수집한 특전</Label>
-                    <Input 
-                      placeholder="특전 이름을 입력하세요 (선택사항)"
-                      className="bg-gray-900 border-red-900/50 text-white mt-2"
                     />
                   </div>
                   
@@ -268,14 +328,24 @@ export function WatchHistory() {
                   <div className="flex gap-2 pt-4">
                     <Button 
                       className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-                      onClick={() => setIsDialogOpen(false)}
+                      onClick={handleCreateRecord}
                     >
                       작성 완료
                     </Button>
                     <Button 
                       variant="outline"
                       className="flex-1 border-red-900/50 text-gray-400 hover:text-white"
-                      onClick={() => setIsDialogOpen(false)}
+                      onClick={() => {
+                        setIsDialogOpen(false);
+                        setFormData({
+                          movieId: '',
+                          viewingDate: '',
+                          theaterId: '',
+                          rating: 0,
+                          review: '',
+                        });
+                        setSelectedRating(0);
+                      }}
                     >
                       취소
                     </Button>
@@ -356,7 +426,7 @@ export function WatchHistory() {
           <div className="space-y-8">
             {filteredMovies.map((record, index) => (
             <motion.div
-              key={record.id}
+              key={record.record_id || index}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}

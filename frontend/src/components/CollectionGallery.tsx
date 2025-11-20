@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Search, Check, Star, Plus, Edit, Trash2 } from 'lucide-react';
 import { Card } from './ui/card';
@@ -6,112 +6,125 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { ImageWithFallback } from './figma/ImageWithFallback';
+import { movieCollectionsApi, collectionsApi } from '../lib/api';
+
+const posterFallback = 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=400&q=80';
+
+interface PerkCollectionItem {
+  perk_id: number;
+  week_no: number;
+  name: string;
+  type: string;
+  image?: string | null;
+  collected: boolean;
+}
+
+interface MovieCollection {
+  movie_id: number;
+  movie_title: string;
+  movie_image?: string | null;
+  collected_count: number;
+  total_count: number;
+  completion_rate: number;
+  perks: PerkCollectionItem[];
+}
 
 export function CollectionGallery() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'collected' | 'missing'>('all');
   const [editingMovie, setEditingMovie] = useState<number | null>(null);
+  const [perksByMovie, setPerksByMovie] = useState<MovieCollection[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [statistics, setStatistics] = useState<{ total_perks: number; collected_perks: number; collection_rate: number } | null>(null);
 
-  // 전체 특전 목록 (영화별로 구성)
-  const [perksByMovie, setPerksByMovie] = useState([
-    {
-      movieId: 1,
-      movieTitle: '듄: 파트2',
-      moviePoster: 'https://images.unsplash.com/photo-1679699316094-a74534381e22?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3ZpZSUyMHBvc3RlciUyMG1pbmltYWx8ZW58MXx8fHwxNzYyMjQ2MDY0fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      perks: [
-        { id: 1, name: '포토카드 세트', week: 1, collected: true, type: 'photocard', image: 'https://images.unsplash.com/photo-1618774945391-a8d74e6fa635?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwaG90b2NhcmQlMjBjb2xsZWN0aWJsZSUyMGNhcmRzfGVufDF8fHx8MTc2MjI1MTIxNnww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-        { id: 2, name: '아크라키스 포스터', week: 2, collected: true, type: 'poster', image: 'https://images.unsplash.com/photo-1712456298333-5747a9506a5d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3ZpZSUyMHBvc3RlciUyMGFydHxlbnwxfHx8fDE3NjIxNTMwOTh8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-        { id: 3, name: '캐릭터 엽서', week: 3, collected: false, type: 'postcard', image: 'https://images.unsplash.com/photo-1579762593217-46655e4e7efc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx2aW50YWdlJTIwcG9zdGNhcmQlMjBhcnR8ZW58MXx8fHwxNzYyMjUxMjE3fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-        { id: 4, name: '특별 필름마크', week: 4, collected: true, type: 'filmmark', image: 'https://images.unsplash.com/photo-1560109947-543149eceb16?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmaWxtJTIwc3RyaXAlMjBjaW5lbWF8ZW58MXx8fHwxNzYyMjUxMjE4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-      ]
-    },
-    {
-      movieId: 2,
-      movieTitle: '웡카',
-      moviePoster: 'https://images.unsplash.com/photo-1607310073276-9f48dec47340?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb2xsZWN0aWJsZSUyMGNhcmRzfGVufDF8fHx8MTc2MjIzODAyNXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      perks: [
-        { id: 5, name: '초콜릿 티켓', week: 1, collected: true, type: 'ticket', image: 'https://images.unsplash.com/photo-1536303100418-985cb308bb38?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxnb2xkZW4lMjB0aWNrZXR8ZW58MXx8fHwxNzYyMjUxMjE4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-        { id: 6, name: '캐릭터 스티커', week: 2, collected: true, type: 'sticker', image: 'https://images.unsplash.com/photo-1669720974831-47816c252ff1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxob2xvZ3JhcGhpYyUyMHN0aWNrZXJ8ZW58MXx8fHwxNzYyMjQxNTc1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-        { id: 7, name: '한정 포토카드', week: 3, collected: true, type: 'photocard', image: 'https://images.unsplash.com/photo-1618774945391-a8d74e6fa635?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwaG90b2NhcmQlMjBjb2xsZWN0aWJsZSUyMGNhcmRzfGVufDF8fHx8MTc2MjI1MTIxNnww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-        { id: 8, name: '골든 티켓', week: 4, collected: false, type: 'ticket', image: 'https://images.unsplash.com/photo-1536303100418-985cb308bb38?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxnb2xkZW4lMjB0aWNrZXR8ZW58MXx8fHwxNzYyMjUxMjE4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-      ]
-    },
-    {
-      movieId: 3,
-      movieTitle: '파묘',
-      moviePoster: 'https://images.unsplash.com/photo-1613771404784-3a5686aa2be3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0cmFkaW5nJTIwY2FyZHN8ZW58MXx8fHwxNzYyMjQ2MDY1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      perks: [
-        { id: 9, name: '부적 카드', week: 1, collected: true, type: 'card', image: 'https://images.unsplash.com/photo-1573168549150-689140c8033e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxteXN0aWNhbCUyMGNhcmQlMjBkZXNpZ258ZW58MXx8fHwxNzYyMjUxMjE4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-        { id: 10, name: '영화 포스터', week: 2, collected: false, type: 'poster', image: 'https://images.unsplash.com/photo-1712456298333-5747a9506a5d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3ZpZSUyMHBvc3RlciUyMGFydHxlbnwxfHx8fDE3NjIxNTMwOTh8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-        { id: 11, name: '캐릭터 엽서 세트', week: 3, collected: false, type: 'postcard', image: 'https://images.unsplash.com/photo-1579762593217-46655e4e7efc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx2aW50YWdlJTIwcG9zdGNhcmQlMjBhcnR8ZW58MXx8fHwxNzYyMjUxMjE3fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-        { id: 12, name: '한정 필름', week: 4, collected: true, type: 'film', image: 'https://images.unsplash.com/photo-1560109947-543149eceb16?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmaWxtJTIwc3RyaXAlMjBjaW5lbWF8ZW58MXx8fHwxNzYyMjUxMjE4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-      ]
-    },
-    {
-      movieId: 4,
-      movieTitle: '오펜하이머',
-      moviePoster: 'https://images.unsplash.com/photo-1679699316094-a74534381e22?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3ZpZSUyMHBvc3RlciUyMG1pbmltYWx8ZW58MXx8fHwxNzYyMjQ2MDY0fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      perks: [
-        { id: 13, name: '한정 포스터', week: 1, collected: true, type: 'poster', image: 'https://images.unsplash.com/photo-1712456298333-5747a9506a5d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3ZpZSUyMHBvc3RlciUyMGFydHxlbnwxfHx8fDE3NjIxNTMwOTh8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-        { id: 14, name: '필름 카드', week: 2, collected: false, type: 'filmmark', image: 'https://images.unsplash.com/photo-1560109947-543149eceb16?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmaWxtJTIwc3RyaXAlMjBjaW5lbWF8ZW58MXx8fHwxNzYyMjUxMjE4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-      ]
-    },
-    {
-      movieId: 5,
-      movieTitle: '서울의 봄',
-      moviePoster: 'https://images.unsplash.com/photo-1607310073276-9f48dec47340?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb2xsZWN0aWJsZSUyMGNhcmRzfGVufDF8fHx8MTc2MjIzODAyNXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      perks: [
-        { id: 15, name: '인물 카드', week: 1, collected: true, type: 'card', image: 'https://images.unsplash.com/photo-1573168549150-689140c8033e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxteXN0aWNhbCUyMGNhcmQlMjBkZXNpZ258ZW58MXx8fHwxNzYyMjUxMjE4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-        { id: 16, name: '엽서 세트', week: 2, collected: true, type: 'postcard', image: 'https://images.unsplash.com/photo-1579762593217-46655e4e7efc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx2aW50YWdlJTIwcG9zdGNhcmQlMjBhcnR8ZW58MXx8fHwxNzYyMjUxMjE3fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-        { id: 17, name: '스페셜 포스터', week: 3, collected: false, type: 'poster', image: 'https://images.unsplash.com/photo-1712456298333-5747a9506a5d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3ZpZSUyMHBvc3RlciUyMGFydHxlbnwxfHx8fDE3NjIxNTMwOTh8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-      ]
-    },
-  ]);
-
-  const getTotalPerks = () => perksByMovie.reduce((sum, movie) => sum + movie.perks.length, 0);
-  const getCollectedPerks = () => perksByMovie.reduce((sum, movie) => 
-    sum + movie.perks.filter(p => p.collected).length, 0);
-  const collectionRate = Math.round((getCollectedPerks() / getTotalPerks()) * 100);
-
-  const togglePerkCollection = (movieId: number, perkId: number) => {
-    setPerksByMovie(prev => prev.map(movie => {
-      if (movie.movieId === movieId) {
-        return {
-          ...movie,
-          perks: movie.perks.map(perk => 
-            perk.id === perkId ? { ...perk, collected: !perk.collected } : perk
-          )
-        };
+  useEffect(() => {
+    const fetchCollections = async () => {
+      try {
+        setLoading(true);
+        const [listData, statsData] = await Promise.all([
+          movieCollectionsApi.getPerkCollectionList({ movie_title: searchQuery || undefined, filter: filterType === 'all' ? '전체' : filterType === 'collected' ? '수집 완료' : '미수집' }),
+          movieCollectionsApi.getPerkCollectionStatistics(),
+        ]);
+        setPerksByMovie(listData);
+        setStatistics(statsData);
+      } catch (err) {
+        setError((err as Error)?.message ?? '컬렉션을 불러오지 못했습니다.');
+      } finally {
+        setLoading(false);
       }
-      return movie;
-    }));
+    };
+    fetchCollections();
+  }, [searchQuery, filterType]);
+
+  const getTotalPerks = () => statistics?.total_perks || perksByMovie.reduce((sum, movie) => sum + movie.total_count, 0);
+  const getCollectedPerks = () => statistics?.collected_perks || perksByMovie.reduce((sum, movie) => sum + movie.collected_count, 0);
+  const collectionRate = statistics?.collection_rate 
+    ? Math.round(statistics.collection_rate) 
+    : (getTotalPerks() > 0 ? Math.round((getCollectedPerks() / getTotalPerks()) * 100) : 0);
+
+  const togglePerkCollection = async (movieId: number, perkId: number) => {
+    try {
+      const movie = perksByMovie.find(m => m.movie_id === movieId);
+      const perk = movie?.perks.find(p => p.perk_id === perkId);
+      
+      if (!perk) return;
+
+      if (perk.collected) {
+        // 컬렉션에서 삭제
+        await collectionsApi.delete(perkId);
+      } else {
+        // 컬렉션에 추가
+        await collectionsApi.create({ perk_id: perkId });
+      }
+
+      // 상태 업데이트
+      setPerksByMovie(prev => prev.map(movie => {
+        if (movie.movie_id === movieId) {
+          return {
+            ...movie,
+            perks: movie.perks.map(p => 
+              p.perk_id === perkId ? { ...p, collected: !p.collected } : p
+            ),
+            collected_count: perk.collected 
+              ? movie.collected_count - 1 
+              : movie.collected_count + 1,
+            completion_rate: ((perk.collected ? movie.collected_count - 1 : movie.collected_count + 1) / movie.total_count) * 100,
+          };
+        }
+        return movie;
+      }));
+    } catch (err) {
+      alert((err as Error)?.message || '컬렉션 업데이트에 실패했습니다.');
+    }
   };
 
-  const deleteMovie = (movieId: number) => {
-    setPerksByMovie(prev => prev.filter(movie => movie.movieId !== movieId));
-    setEditingMovie(null);
+  const deleteMovie = async (movieId: number) => {
+    if (!confirm('이 영화의 모든 컬렉션을 삭제하시겠습니까?')) {
+      return;
+    }
+    
+    try {
+      const movie = perksByMovie.find(m => m.movie_id === movieId);
+      if (movie) {
+        // 모든 수집된 특전 삭제
+        const collectedPerks = movie.perks.filter(p => p.collected);
+        await Promise.all(collectedPerks.map(perk => collectionsApi.delete(perk.perk_id)));
+        
+        // 목록에서 제거
+        setPerksByMovie(prev => prev.filter(m => m.movie_id !== movieId));
+        setEditingMovie(null);
+      }
+    } catch (err) {
+      alert((err as Error)?.message || '삭제에 실패했습니다.');
+    }
   };
 
   const saveEdit = (movieId: number) => {
     setEditingMovie(null);
-    // 실제로는 여기서 API 호출 등으로 저장
   };
 
-  const filteredMovies = perksByMovie.filter(movie => {
-    // 검색 필터
-    if (searchQuery && !movie.movieTitle.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
-    }
-    
-    // 수집 상태 필터
-    if (filterType === 'collected') {
-      return movie.perks.some(p => p.collected);
-    } else if (filterType === 'missing') {
-      return movie.perks.some(p => !p.collected);
-    }
-    
-    return true;
-  });
+  const filteredMovies = perksByMovie;
 
   return (
     <div className="min-h-screen px-4 py-12">
@@ -126,22 +139,34 @@ export function CollectionGallery() {
         </motion.div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card className="bg-black border-2 border-red-900/50 p-6 shadow-lg">
-            <div className="text-sm text-gray-400 mb-2">총 특전</div>
-            <div className="text-3xl text-white">{getTotalPerks()}</div>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <Card className="bg-black border-2 border-red-900/50 p-6 shadow-lg">
+              <div className="text-sm text-gray-400 mb-2">로딩 중...</div>
+            </Card>
+          </div>
+        ) : error ? (
+          <Card className="bg-black border-2 border-red-900/50 p-6 mb-8">
+            <div className="text-red-500">{error}</div>
           </Card>
-          
-          <Card className="bg-black border-2 border-red-900/50 p-6 shadow-lg">
-            <div className="text-sm text-gray-400 mb-2">수집 완료</div>
-            <div className="text-3xl text-white">{getCollectedPerks()}</div>
-          </Card>
-          
-          <Card className="bg-black border-2 border-red-900/50 p-6 shadow-lg">
-            <div className="text-sm text-gray-400 mb-2">수집률</div>
-            <div className="text-3xl text-white">{collectionRate}%</div>
-          </Card>
-        </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <Card className="bg-black border-2 border-red-900/50 p-6 shadow-lg">
+              <div className="text-sm text-gray-400 mb-2">총 특전</div>
+              <div className="text-3xl text-white">{getTotalPerks()}</div>
+            </Card>
+            
+            <Card className="bg-black border-2 border-red-900/50 p-6 shadow-lg">
+              <div className="text-sm text-gray-400 mb-2">수집 완료</div>
+              <div className="text-3xl text-white">{getCollectedPerks()}</div>
+            </Card>
+            
+            <Card className="bg-black border-2 border-red-900/50 p-6 shadow-lg">
+              <div className="text-sm text-gray-400 mb-2">수집률</div>
+              <div className="text-3xl text-white">{collectionRate}%</div>
+            </Card>
+          </div>
+        )}
 
         {/* Overall Collection Progress */}
         <Card className="bg-black border-2 border-red-900/50 p-6 mb-8 shadow-lg">
@@ -194,85 +219,94 @@ export function CollectionGallery() {
         </div>
 
         {/* Perks Grid by Movie */}
-        <div className="space-y-8">
-          {filteredMovies.map((movie, index) => {
-            const collectedCount = movie.perks.filter(p => p.collected).length;
-            const totalCount = movie.perks.length;
-            const movieProgress = Math.round((collectedCount / totalCount) * 100);
-            const isEditing = editingMovie === movie.movieId;
+        {loading ? (
+          <Card className="bg-black border-2 border-red-900/50 p-12 text-center">
+            <p className="text-gray-400">컬렉션을 불러오는 중...</p>
+          </Card>
+        ) : error ? (
+          <Card className="bg-black border-2 border-red-900/50 p-12 text-center">
+            <p className="text-red-500">{error}</p>
+          </Card>
+        ) : (
+          <div className="space-y-8">
+            {filteredMovies.map((movie, index) => {
+              const collectedCount = movie.collected_count;
+              const totalCount = movie.total_count;
+              const movieProgress = Math.round(movie.completion_rate || 0);
+              const isEditing = editingMovie === movie.movie_id;
 
-            return (
-              <motion.div
-                key={movie.movieId}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <Card className="bg-black border-2 border-red-900/50 overflow-hidden shadow-lg shadow-red-950/50">
-                  {/* Movie Header */}
-                  <div className="p-6 border-b border-red-900/30">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-16 h-24 bg-gray-800 rounded-lg overflow-hidden flex-shrink-0 border border-red-900/30">
-                          <ImageWithFallback
-                            src={movie.moviePoster}
-                            alt={movie.movieTitle}
-                            className="w-full h-full object-cover"
-                          />
+              return (
+                <motion.div
+                  key={movie.movie_id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                >
+                  <Card className="bg-black border-2 border-red-900/50 overflow-hidden shadow-lg shadow-red-950/50">
+                    {/* Movie Header */}
+                    <div className="p-6 border-b border-red-900/30">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-16 h-24 bg-gray-800 rounded-lg overflow-hidden flex-shrink-0 border border-red-900/30">
+                            <ImageWithFallback
+                              src={movie.movie_image || posterFallback}
+                              alt={movie.movie_title}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div>
+                            <h3 className="text-xl text-white mb-2">{movie.movie_title}</h3>
+                            <Badge variant="outline" className="border-red-600/50 text-red-600">
+                              {collectedCount}/{totalCount} 수집
+                            </Badge>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="text-xl text-white mb-2">{movie.movieTitle}</h3>
-                          <Badge variant="outline" className="border-red-600/50 text-red-600">
-                            {collectedCount}/{totalCount} 수집
-                          </Badge>
+                        <div className="flex items-center gap-2">
+                          <div className="text-right mr-4">
+                            <div className="text-2xl text-white mb-1">{movieProgress}%</div>
+                            <div className="text-xs text-gray-400">완료율</div>
+                          </div>
+                          {isEditing ? (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => saveEdit(movie.movie_id)}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                              >
+                                저장
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setEditingMovie(null)}
+                                className="border-gray-600 text-gray-400 hover:text-white"
+                              >
+                                취소
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setEditingMovie(movie.movie_id)}
+                                className="border-red-600/50 text-red-600 hover:bg-red-600/10"
+                              >
+                                <Edit className="w-4 h-4 mr-1" />
+                                수정
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => deleteMovie(movie.movie_id)}
+                                className="border-gray-600 text-gray-400 hover:text-red-600 hover:border-red-600"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="text-right mr-4">
-                          <div className="text-2xl text-white mb-1">{movieProgress}%</div>
-                          <div className="text-xs text-gray-400">완료율</div>
-                        </div>
-                        {isEditing ? (
-                          <>
-                            <Button
-                              size="sm"
-                              onClick={() => saveEdit(movie.movieId)}
-                              className="bg-green-600 hover:bg-green-700 text-white"
-                            >
-                              저장
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setEditingMovie(null)}
-                              className="border-gray-600 text-gray-400 hover:text-white"
-                            >
-                              취소
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setEditingMovie(movie.movieId)}
-                              className="border-red-600/50 text-red-600 hover:bg-red-600/10"
-                            >
-                              <Edit className="w-4 h-4 mr-1" />
-                              수정
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => deleteMovie(movie.movieId)}
-                              className="border-gray-600 text-gray-400 hover:text-red-600 hover:border-red-600"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
                     <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
                       <div 
                         className="bg-red-600 h-full transition-all duration-500"
@@ -281,92 +315,81 @@ export function CollectionGallery() {
                     </div>
                   </div>
 
-                  {/* Perks Grid */}
-                  <div className="p-6">
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                      {movie.perks.map((perk) => (
-                        <motion.div
-                          key={perk.id}
-                          whileHover={{ scale: isEditing ? 1.02 : 1 }}
-                          onClick={() => isEditing && togglePerkCollection(movie.movieId, perk.id)}
-                          className={`relative aspect-[3/4] rounded-xl border-2 transition-all overflow-hidden ${
-                            perk.collected
-                              ? 'border-red-600/50 shadow-lg shadow-red-900/30'
-                              : 'border-gray-800'
-                          } ${isEditing ? 'cursor-pointer hover:border-red-600/30' : ''}`}
-                        >
-                          {/* Background Image */}
-                          <ImageWithFallback
-                            src={perk.image}
-                            alt={perk.name}
-                            className={`w-full h-full object-cover transition-all ${
-                              perk.collected ? 'opacity-100' : 'opacity-30 grayscale'
-                            }`}
-                          />
-                          
-                          {/* Overlay */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+                    {/* Perks Grid */}
+                    <div className="p-6">
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {movie.perks.map((perk) => (
+                          <motion.div
+                            key={perk.perk_id}
+                            whileHover={{ scale: isEditing ? 1.02 : 1 }}
+                            onClick={() => isEditing && togglePerkCollection(movie.movie_id, perk.perk_id)}
+                            className={`relative aspect-[3/4] rounded-xl border-2 transition-all overflow-hidden ${
+                              perk.collected
+                                ? 'border-red-600/50 shadow-lg shadow-red-900/30'
+                                : 'border-gray-800'
+                            } ${isEditing ? 'cursor-pointer hover:border-red-600/30' : ''}`}
+                          >
+                            {/* Background Image */}
+                            <ImageWithFallback
+                              src={perk.image || posterFallback}
+                              alt={perk.name}
+                              className={`w-full h-full object-cover transition-all ${
+                                perk.collected ? 'opacity-100' : 'opacity-30 grayscale'
+                              }`}
+                            />
+                            
+                            {/* Overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
 
-                          {/* Card Content */}
-                          <div className="absolute inset-0 p-4 flex flex-col">
-                            {/* Week Badge */}
-                            <div className="absolute top-2 left-2">
-                              <Badge variant="secondary" className="text-xs bg-black/70 text-gray-300 backdrop-blur-sm">
-                                {perk.week}주차
-                              </Badge>
-                            </div>
+                            {/* Card Content */}
+                            <div className="absolute inset-0 p-4 flex flex-col">
+                              {/* Week Badge */}
+                              <div className="absolute top-2 left-2">
+                                <Badge variant="secondary" className="text-xs bg-black/70 text-gray-300 backdrop-blur-sm">
+                                  {perk.week_no}주차
+                                </Badge>
+                              </div>
 
-                            {/* Collected Check */}
-                            {perk.collected && (
-                              <div className="absolute top-2 right-2">
-                                <div className="w-7 h-7 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
-                                  <Check className="w-4 h-4 text-white" />
+                              {/* Collected Check */}
+                              {perk.collected && (
+                                <div className="absolute top-2 right-2">
+                                  <div className="w-7 h-7 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
+                                    <Check className="w-4 h-4 text-white" />
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              )}
 
-                            {/* Perk Info */}
-                            <div className="mt-auto relative z-10">
-                              <div className={`text-sm mb-2 ${perk.collected ? 'text-white' : 'text-gray-500'}`}>
-                                {perk.name}
+                              {/* Perk Info */}
+                              <div className="mt-auto relative z-10">
+                                <div className={`text-sm mb-2 ${perk.collected ? 'text-white' : 'text-gray-500'}`}>
+                                  {perk.name}
+                                </div>
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-xs backdrop-blur-sm ${
+                                    perk.collected ? 'text-gray-300 border-gray-500 bg-black/30' : 'text-gray-600 border-gray-700 bg-black/50'
+                                  }`}
+                                >
+                                  {perk.type}
+                                </Badge>
                               </div>
-                              <Badge 
-                                variant="outline" 
-                                className={`text-xs backdrop-blur-sm ${
-                                  perk.collected ? 'text-gray-300 border-gray-500 bg-black/30' : 'text-gray-600 border-gray-700 bg-black/50'
-                                }`}
-                              >
-                                {perk.type}
-                              </Badge>
                             </div>
-                          </div>
-                        </motion.div>
-                      ))}
+                          </motion.div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              </motion.div>
-            );
-          })}
-        </div>
+                  </Card>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
 
-        {filteredMovies.length === 0 && (
+        {!loading && !error && filteredMovies.length === 0 && (
           <Card className="bg-black border-2 border-red-900/50 p-12 text-center">
             <p className="text-gray-400">검색 결과가 없습니다.</p>
           </Card>
         )}
-
-        {/* Add Button */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="mt-8 text-center"
-        >
-          <Button size="lg" className="bg-red-600 hover:bg-red-700 text-white">
-            <Plus className="w-5 h-5 mr-2" />
-            특전 도감 추가하기
-          </Button>
-        </motion.div>
       </div>
     </div>
   );

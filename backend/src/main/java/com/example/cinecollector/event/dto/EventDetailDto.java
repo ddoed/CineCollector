@@ -32,6 +32,9 @@ public class EventDetailDto {
     @JsonProperty("week_no")
     private Integer weekNo;
 
+    @JsonProperty("image")
+    private String image;
+
     @JsonProperty("perks")
     private List<PerkDetailDto> perks;
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Calendar, Film, Gift, Plus, Edit, Trash2, MapPin, Search, Eye, EyeOff } from 'lucide-react';
 import { Card } from './ui/card';
@@ -11,13 +11,49 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Switch } from './ui/switch';
 import { Checkbox } from './ui/checkbox';
 import { ImageWithFallback } from './figma/ImageWithFallback';
+import { eventsApi, theatersApi, moviesApi, inventoryApi } from '../lib/api';
+import { StockDistributionDialog } from './StockDistributionDialog';
+
+const posterFallback = 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=400&q=80';
 
 export function CreatorDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTheaters, setSelectedTheaters] = useState<number[]>([]);
   const [theaterSearchQuery, setTheaterSearchQuery] = useState('');
+  const [events, setEvents] = useState<any[]>([]);
+  const [theaters, setTheaters] = useState<any[]>([]);
+  const [movies, setMovies] = useState<any[]>([]);
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedEventForDistribution, setSelectedEventForDistribution] = useState<any>(null);
+  const [distributionStocks, setDistributionStocks] = useState<Record<number, number>>({});
 
-  const theaters = [
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [eventsData, theatersData, moviesData, statsData] = await Promise.all([
+          eventsApi.getManagementList({ status: '전체' }),
+          theatersApi.getAll(),
+          moviesApi.getAll(),
+          eventsApi.getManagementStatistics(),
+        ]);
+        setEvents(eventsData);
+        setTheaters(theatersData);
+        setMovies(moviesData);
+        setAnalytics(statsData);
+      } catch (err) {
+        setError((err as Error)?.message ?? '데이터를 불러오지 못했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const mockTheaters = [
     { id: 1, name: 'CGV 용산아이파크몰', region: '서울' },
     { id: 2, name: 'CGV 강남', region: '서울' },
     { id: 3, name: '메가박스 코엑스', region: '서울' },
@@ -37,11 +73,11 @@ export function CreatorDashboard() {
   };
 
   const filteredTheaters = theaters.filter(theater => 
-    theater.name.toLowerCase().includes(theaterSearchQuery.toLowerCase()) ||
-    theater.region.toLowerCase().includes(theaterSearchQuery.toLowerCase())
+    theater.name?.toLowerCase().includes(theaterSearchQuery.toLowerCase()) ||
+    theater.location?.toLowerCase().includes(theaterSearchQuery.toLowerCase())
   );
 
-  const events = [
+  const mockEvents = [
     {
       id: 1,
       movie: '듄: 파트2',
@@ -129,17 +165,95 @@ export function CreatorDashboard() {
     },
   ];
 
-  const analytics = {
-    totalEvents: events.length,
-    activeEvents: events.filter(e => e.status === 'ACTIVE').length,
-    totalPerks: events.reduce((sum, e) => sum + e.perk.quantity, 0),
+  const filteredEvents = events.filter(event => {
+    const movieTitle = event.movie?.title || '';
+    const eventTitle = event.title || '';
+    return movieTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           eventTitle.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  const handleCreateEvent = async (formData: any) => {
+    try {
+      const movie = movies.find(m => m.title === formData.movieTitle);
+      if (!movie) {
+        alert('영화를 찾을 수 없습니다.');
+        return;
+      }
+
+      await eventsApi.createWithPerk({
+        movie_id: movie.movie_id,
+        title: formData.eventTitle,
+        start_date: formData.startDate,
+        end_date: formData.endDate,
+        week_no: formData.weekNo,
+        event_image: formData.eventImage,
+        is_public: formData.isPublic,
+        theater_ids: selectedTheaters,
+        perk: {
+          name: formData.perkName,
+          type: formData.perkType,
+          total_quantity: formData.totalQuantity,
+          limit_per_user: formData.limitPerUser,
+          description: formData.perkDescription,
+          perk_image: formData.perkImage,
+        },
+      });
+
+      // 목록 새로고침
+      const [eventsData, statsData] = await Promise.all([
+        eventsApi.getManagementList({ status: '전체' }),
+        eventsApi.getManagementStatistics(),
+      ]);
+      setEvents(eventsData);
+      setAnalytics(statsData);
+      setIsDialogOpen(false);
+      setSelectedTheaters([]);
+      alert('이벤트가 등록되었습니다.');
+    } catch (err) {
+      alert((err as Error)?.message || '이벤트 등록에 실패했습니다.');
+    }
   };
 
-  // Filter events based on search query
-  const filteredEvents = events.filter(event => 
-    event.movie.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    event.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleDeleteEvent = async (eventId: number) => {
+    if (!confirm('정말 이벤트를 삭제하시겠습니까?')) {
+      return;
+    }
+    try {
+      await eventsApi.delete(eventId);
+      const [eventsData, statsData] = await Promise.all([
+        eventsApi.getManagementList({ status: '전체' }),
+        eventsApi.getManagementStatistics(),
+      ]);
+      setEvents(eventsData);
+      setAnalytics(statsData);
+      alert('이벤트가 삭제되었습니다.');
+    } catch (err) {
+      alert((err as Error)?.message || '이벤트 삭제에 실패했습니다.');
+    }
+  };
+
+  const handleDistributeStock = async (perkId: number) => {
+    try {
+      const distributions = Object.entries(distributionStocks)
+        .filter(([_, stock]) => stock > 0)
+        .map(([theaterId, stock]) => ({
+          theater_id: Number(theaterId),
+          stock: Number(stock),
+        }));
+
+      if (distributions.length === 0) {
+        alert('배포할 재고를 입력해주세요.');
+        return;
+      }
+
+      await inventoryApi.distributeStock(perkId, { distributions });
+      setSelectedEventForDistribution(null);
+      setDistributionStocks({});
+      alert('재고 배포가 완료되었습니다.');
+    } catch (err) {
+      alert((err as Error)?.message || '재고 배포에 실패했습니다.');
+    }
+  };
 
   return (
     <div className="min-h-screen px-4 py-12">
@@ -155,56 +269,104 @@ export function CreatorDashboard() {
               <Calendar className="w-8 h-8 text-red-600" />
               <h1 className="text-3xl md:text-4xl text-white">이벤트 관리</h1>
             </div>
-            <Dialog>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button size="lg" className="bg-red-600 hover:bg-red-700 text-white">
                   <Plus className="w-5 h-5 mr-2" />
                   신규 이벤트 등록
                 </Button>
               </DialogTrigger>
-              <DialogContent className="bg-black border-2 border-red-600/50 text-white max-w-6xl max-h-[90vh] overflow-y-auto">
+              <DialogContent 
+                className="bg-black border-2 border-red-600/50 text-white max-h-[90vh] overflow-y-auto"
+                style={{ maxWidth: '60vw', width: '60vw' }}
+              >
                 <DialogHeader>
                   <DialogTitle className="text-xl text-white">신규 이벤트 등록</DialogTitle>
                   <DialogDescription className="text-gray-400">
                     새로운 특전 이벤트를 등록합니다. 이벤트 하나당 특전 하나가 등록됩니다.
                   </DialogDescription>
                 </DialogHeader>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.target as HTMLFormElement);
+                  const isPublicValue = formData.get('isPublic');
+                  handleCreateEvent({
+                    movieTitle: formData.get('movieTitle') as string,
+                    eventTitle: formData.get('eventTitle') as string,
+                    startDate: formData.get('startDate') as string,
+                    endDate: formData.get('endDate') as string,
+                    weekNo: Number(formData.get('weekNo')),
+                    eventImage: formData.get('eventImage') as string || undefined,
+                    isPublic: isPublicValue === 'true' || isPublicValue === 'on',
+                    perkName: formData.get('perkName') as string,
+                    perkType: formData.get('perkType') as string,
+                    totalQuantity: Number(formData.get('totalQuantity')),
+                    limitPerUser: Number(formData.get('limitPerUser')),
+                    perkDescription: formData.get('perkDescription') as string || undefined,
+                    perkImage: formData.get('perkImage') as string || undefined,
+                  });
+                }}>
                 <div className="grid grid-cols-2 gap-6 mt-4">
                   {/* Left Column - Event Info */}
                   <div className="space-y-4">
                     <div>
-                      <Label className="text-gray-300">영화 제목</Label>
-                      <Input 
-                        placeholder="영화 제목 입력"
-                        className="bg-gray-900 border-red-900/50 text-white mt-2"
-                      />
+                      <Label className="text-gray-300">영화 선택</Label>
+                      <Select name="movieTitle" required>
+                        <SelectTrigger className="bg-gray-900 border-red-900/50 text-white mt-2">
+                          <SelectValue placeholder="영화를 선택하세요" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-900 border-red-900/50">
+                          {movies.map(movie => (
+                            <SelectItem key={movie.movie_id} value={movie.title} className="text-white">
+                              {movie.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
                       <Label className="text-gray-300">이벤트 제목</Label>
                       <Input 
+                        name="eventTitle"
                         placeholder="예: 1주차 포토카드 이벤트"
                         className="bg-gray-900 border-red-900/50 text-white mt-2"
+                        required
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label className="text-gray-300">시작일</Label>
                         <Input 
+                          name="startDate"
                           type="date"
                           className="bg-gray-900 border-red-900/50 text-white mt-2"
+                          required
                         />
                       </div>
                       <div>
                         <Label className="text-gray-300">종료일</Label>
                         <Input 
+                          name="endDate"
                           type="date"
                           className="bg-gray-900 border-red-900/50 text-white mt-2"
+                          required
                         />
                       </div>
                     </div>
                     <div>
+                      <Label className="text-gray-300">주차</Label>
+                      <Input 
+                        name="weekNo"
+                        type="number"
+                        placeholder="1"
+                        className="bg-gray-900 border-red-900/50 text-white mt-2"
+                        required
+                      />
+                    </div>
+                    <div>
                       <Label className="text-gray-300">이벤트 이미지 URL</Label>
                       <Input 
+                        name="eventImage"
                         placeholder="https://..."
                         className="bg-gray-900 border-red-900/50 text-white mt-2"
                       />
@@ -217,14 +379,16 @@ export function CreatorDashboard() {
                         <div>
                           <Label className="text-gray-300">특전 이름</Label>
                           <Input 
+                            name="perkName"
                             placeholder="예: 포토카드 세트"
                             className="bg-gray-900 border-red-900/50 text-white mt-2"
+                            required
                           />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <Label className="text-gray-300">특전 종류</Label>
-                            <Select>
+                            <Select name="perkType" required>
                               <SelectTrigger className="bg-gray-900 border-red-900/50 text-white mt-2">
                                 <SelectValue placeholder="선택" />
                               </SelectTrigger>
@@ -239,24 +403,55 @@ export function CreatorDashboard() {
                           <div>
                             <Label className="text-gray-300">총 제작 수량</Label>
                             <Input 
+                              name="totalQuantity"
                               type="number"
                               placeholder="500"
                               className="bg-gray-900 border-red-900/50 text-white mt-2"
+                              required
                             />
                           </div>
                         </div>
                         <div>
                           <Label className="text-gray-300">1인당 수령 제한</Label>
                           <Input 
+                            name="limitPerUser"
                             type="number"
                             placeholder="1"
+                            className="bg-gray-900 border-red-900/50 text-white mt-2"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-gray-300">특전 설명</Label>
+                          <Input 
+                            name="perkDescription"
+                            placeholder="특전 설명 (선택사항)"
+                            className="bg-gray-900 border-red-900/50 text-white mt-2"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-gray-300">특전 이미지 URL</Label>
+                          <Input 
+                            name="perkImage"
+                            placeholder="https://..."
                             className="bg-gray-900 border-red-900/50 text-white mt-2"
                           />
                         </div>
                         <div>
                           <div className="flex items-center justify-between">
                             <Label className="text-gray-300">이벤트 공개</Label>
-                            <Switch defaultChecked className="data-[state=checked]:bg-red-600" />
+                            <input type="hidden" name="isPublic" value="false" />
+                            <Switch 
+                              name="isPublic"
+                              defaultChecked 
+                              className="data-[state=checked]:bg-red-600"
+                              onCheckedChange={(checked) => {
+                                const hiddenInput = document.querySelector('input[name="isPublic"]') as HTMLInputElement;
+                                if (hiddenInput) {
+                                  hiddenInput.value = checked ? 'true' : 'false';
+                                }
+                              }}
+                            />
                           </div>
                           <p className="text-xs text-gray-500 mt-2">
                             비공개 시 일반 사용자에게 표시되지 않습니다
@@ -273,10 +468,10 @@ export function CreatorDashboard() {
                       <div className="flex items-center gap-2">
                         <Checkbox 
                           id="select-all"
-                          checked={selectedTheaters.length === theaters.length}
+                          checked={selectedTheaters.length === theaters.length && theaters.length > 0}
                           onCheckedChange={(checked) => {
                             if (checked) {
-                              setSelectedTheaters(theaters.map(t => t.id));
+                              setSelectedTheaters(theaters.map(t => t.theater_id));
                             } else {
                               setSelectedTheaters([]);
                             }
@@ -309,21 +504,18 @@ export function CreatorDashboard() {
                         </div>
                       ) : (
                         filteredTheaters.map((theater) => (
-                          <div key={theater.id} className="flex items-center gap-2 bg-gray-900 p-3 rounded-lg border border-red-900/30 hover:border-red-600/50 transition-colors">
+                          <div key={theater.theater_id} className="flex items-center gap-2 bg-gray-900 p-3 rounded-lg border border-red-900/30 hover:border-red-600/50 transition-colors">
                             <Checkbox 
-                              id={`theater-${theater.id}`}
-                              checked={selectedTheaters.includes(theater.id)}
-                              onCheckedChange={() => handleTheaterToggle(theater.id)}
+                              id={`theater-${theater.theater_id}`}
+                              checked={selectedTheaters.includes(theater.theater_id)}
+                              onCheckedChange={() => handleTheaterToggle(theater.theater_id)}
                               className="border-red-600 data-[state=checked]:bg-red-600"
                             />
                             <Label 
-                              htmlFor={`theater-${theater.id}`} 
+                              htmlFor={`theater-${theater.theater_id}`} 
                               className="text-gray-300 cursor-pointer flex items-center gap-2 flex-1"
                             >
                               <span className="flex-1">{theater.name}</span>
-                              <Badge variant="outline" className="border-gray-600 text-gray-500 text-xs">
-                                {theater.region}
-                              </Badge>
                             </Label>
                           </div>
                         ))
@@ -333,10 +525,11 @@ export function CreatorDashboard() {
                 </div>
                 
                 <div className="flex gap-2 pt-4 mt-6 border-t border-red-900/30">
-                  <Button className="flex-1 bg-red-600 hover:bg-red-700 text-white">
+                  <Button type="submit" className="flex-1 bg-red-600 hover:bg-red-700 text-white">
                     이벤트 등록
                   </Button>
                 </div>
+                </form>
               </DialogContent>
             </Dialog>
           </div>
@@ -344,37 +537,49 @@ export function CreatorDashboard() {
         </motion.div>
 
         {/* Analytics */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card className="bg-gray-900 border-red-900/50 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-gray-400 mb-1">총 이벤트</div>
-                <div className="text-2xl text-white">{analytics.totalEvents}</div>
-              </div>
-              <Calendar className="w-8 h-8 text-red-600" />
-            </div>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <Card className="bg-gray-900 border-red-900/50 p-6">
+              <div className="text-gray-400">로딩 중...</div>
+            </Card>
+          </div>
+        ) : error ? (
+          <Card className="bg-gray-900 border-red-900/50 p-6 mb-8">
+            <div className="text-red-500">{error}</div>
           </Card>
-          
-          <Card className="bg-gray-900 border-red-900/50 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-gray-400 mb-1">진행중</div>
-                <div className="text-2xl text-white">{analytics.activeEvents}</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <Card className="bg-gray-900 border-red-900/50 p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-gray-400 mb-1">총 이벤트</div>
+                  <div className="text-2xl text-white">{analytics?.total_events || 0}</div>
+                </div>
+                <Calendar className="w-8 h-8 text-red-600" />
               </div>
-              <Film className="w-8 h-8 text-red-600" />
-            </div>
-          </Card>
-          
-          <Card className="bg-gray-900 border-red-900/50 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-gray-400 mb-1">총 특전 수량</div>
-                <div className="text-2xl text-white">{analytics.totalPerks.toLocaleString()}</div>
+            </Card>
+            
+            <Card className="bg-gray-900 border-red-900/50 p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-gray-400 mb-1">진행중</div>
+                  <div className="text-2xl text-white">{analytics?.ongoing_events || 0}</div>
+                </div>
+                <Film className="w-8 h-8 text-red-600" />
               </div>
-              <Gift className="w-8 h-8 text-red-600" />
-            </div>
-          </Card>
-        </div>
+            </Card>
+            
+            <Card className="bg-gray-900 border-red-900/50 p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-gray-400 mb-1">총 특전 수량</div>
+                  <div className="text-2xl text-white">{(analytics?.total_perk_quantity || 0).toLocaleString()}</div>
+                </div>
+                <Gift className="w-8 h-8 text-red-600" />
+              </div>
+            </Card>
+          </div>
+        )}
 
         {/* Search Bar */}
         <div className="mb-8">
@@ -391,195 +596,139 @@ export function CreatorDashboard() {
         </div>
 
         {/* Events List */}
-        <div className="space-y-6">
-          {filteredEvents.length === 0 ? (
-            <Card className="bg-gray-900 border-red-900/30 p-12">
-              <div className="text-center">
-                <Search className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                <p className="text-gray-400">검색 결과가 없습니다.</p>
-              </div>
-            </Card>
-          ) : (
-            filteredEvents.map((event, index) => {
-            return (
-              <motion.div
-                key={event.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <Card className="bg-gray-900 border-red-900/30 overflow-hidden h-[380px]">
-                  <div className="grid grid-cols-1 lg:grid-cols-12 h-full">
-                    {/* Image */}
-                    <div className="lg:col-span-3 h-full">
-                      <div className="relative h-full">
-                        <ImageWithFallback
-                          src={event.image}
-                          alt={event.movie}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-                        <Badge 
-                          className={`absolute top-4 right-4 ${
-                            event.status === 'ACTIVE' 
-                              ? 'bg-red-600' 
-                              : 'bg-gray-600'
-                          } text-white border-0`}
-                        >
-                          {event.status === 'ACTIVE' ? '진행중' : '종료'}
-                        </Badge>
-                      </div>
-                    </div>
+        {loading ? (
+          <Card className="bg-gray-900 border-red-900/30 p-12 text-center">
+            <p className="text-gray-400">이벤트를 불러오는 중...</p>
+          </Card>
+        ) : error ? (
+          <Card className="bg-gray-900 border-red-900/30 p-12 text-center">
+            <p className="text-red-500">{error}</p>
+          </Card>
+        ) : (
+          <div className="space-y-6">
+            {filteredEvents.length === 0 ? (
+              <Card className="bg-gray-900 border-red-900/30 p-12">
+                <div className="text-center">
+                  <Search className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+                  <p className="text-gray-400">검색 결과가 없습니다.</p>
+                </div>
+              </Card>
+            ) : (
+              filteredEvents.map((event, index) => {
+                const firstPerk = event.perks && event.perks.length > 0 ? event.perks[0] : null;
+                const status = event.status === '진행 중' ? 'ACTIVE' : 'COMPLETED';
+                return (
+                  <motion.div
+                    key={event.event_id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                  >
+                    <Card className="bg-gray-900 border-red-900/30 overflow-hidden h-[380px]">
+                      <div className="grid grid-cols-1 lg:grid-cols-12 h-full">
+                        {/* Image */}
+                        <div className="lg:col-span-3 h-full">
+                          <div className="relative h-full">
+                            <ImageWithFallback
+                              src={event.movie?.image || event.image || posterFallback}
+                              alt={event.movie?.title || '이벤트 이미지'}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                            <Badge 
+                              className={`absolute top-4 right-4 ${
+                                status === 'ACTIVE' 
+                                  ? 'bg-red-600' 
+                                  : 'bg-gray-600'
+                              } text-white border-0`}
+                            >
+                              {status === 'ACTIVE' ? '진행중' : '종료'}
+                            </Badge>
+                          </div>
+                        </div>
 
-                    {/* Content */}
-                    <div className="lg:col-span-9 p-6 flex flex-col h-full">
-                      {/* Header */}
-                      <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4 min-h-[80px]">
-                        <div>
-                          <h3 className="mb-1 text-white">{event.movie}</h3>
-                          <p className="text-sm text-gray-400 mb-2">{event.title}</p>
-                          <div className="flex items-center gap-1 text-xs text-gray-400">
-                            <Calendar className="w-3 h-3" />
-                            {event.startDate} ~ {event.endDate}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 md:self-start">
-                          <Button size="sm" variant="outline" className="border-red-600 text-red-600 hover:bg-red-600/10">
-                            <Edit className="w-4 h-4 mr-1" />
-                            수정
-                          </Button>
-                          <Button size="sm" variant="outline" className="border-red-600 text-red-600 hover:bg-red-600/10">
-                            <Trash2 className="w-4 h-4 mr-1" />
-                            삭제
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Perk Info Card */}
-                      <div className="bg-black border border-red-900/30 rounded-lg p-5 flex flex-col h-[240px]">
-                        <div className="flex items-center gap-2 mb-3">
-                          <h4 className="text-white text-lg">{event.perk.name}</h4>
-                          <Badge variant="outline" className="border-gray-600 text-gray-400 text-xs">
-                            {event.perk.type}
-                          </Badge>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3 text-sm mb-3">
-                          <div>
-                            <span className="text-gray-400">총 제작 수량: </span>
-                            <span className="text-white">{event.perk.quantity}개</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-400">1인당 수령: </span>
-                            <span className="text-red-500">{event.perk.limitPerPerson}개</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-400">참여 극장: </span>
-                            <span className="text-white">{event.theaters}개</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 py-3 border-t border-red-900/20 mb-3">
-                          <div className="flex items-center gap-2">
-                            {event.isPublic ? (
-                              <Eye className="w-4 h-4 text-green-500" />
-                            ) : (
-                              <EyeOff className="w-4 h-4 text-gray-500" />
-                            )}
-                            <span className={`text-sm ${event.isPublic ? 'text-green-500' : 'text-gray-500'}`}>
-                              {event.isPublic ? '공개' : '비공개'}
-                            </span>
-                          </div>
-                          <Switch 
-                            defaultChecked={event.isPublic} 
-                            className="data-[state=checked]:bg-red-600"
-                          />
-                        </div>
-                        
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button className="w-full bg-red-600 hover:bg-red-700 text-white mt-auto">
-                              <MapPin className="w-4 h-4 mr-2" />
-                              극장별 재고 배포 관리
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="bg-black border-2 border-red-600/50 text-white max-w-3xl max-h-[80vh] overflow-y-auto">
-                            <DialogHeader>
-                              <DialogTitle className="text-xl text-white">
-                                {event.perk.name} - 극장별 재고 배포
-                              </DialogTitle>
-                              <DialogDescription className="text-gray-400">
-                                각 극장에 배포할 재고를 등록합니다. (Inventory INSERT)
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 mt-4">
-                              {/* Perk Info */}
-                              <Card className="bg-gray-900 border-red-900/30 p-4">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <div className="text-sm text-gray-400">특전 정보</div>
-                                    <div className="text-white mt-1">{event.movie}</div>
-                                    <div className="text-sm text-gray-400 mt-1">{event.perk.name} ({event.perk.type})</div>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="text-sm text-gray-400">총 제작 수량</div>
-                                    <div className="text-2xl text-red-500">{event.perk.quantity}</div>
-                                  </div>
-                                </div>
-                              </Card>
-
-                              {/* Theaters List */}
-                              <div className="space-y-3">
-                                {[
-                                  { id: 1, name: 'CGV 용산아이파크몰', region: '서울', current: 0 },
-                                  { id: 2, name: 'CGV 강남', region: '서울', current: 0 },
-                                  { id: 3, name: '메가박스 코엑스', region: '서울', current: 0 },
-                                  { id: 4, name: 'CGV 대구', region: '대구', current: 0 },
-                                  { id: 5, name: '롯데시네마 부산', region: '부산', current: 0 },
-                                  { id: 6, name: 'CGV 광주', region: '광주', current: 0 },
-                                  { id: 7, name: '메가박스 대전', region: '대전', current: 0 },
-                                  { id: 8, name: '롯데시네마 인천', region: '인천', current: 0 },
-                                ].map((theater) => (
-                                  <Card key={theater.id} className="bg-gray-900 border-red-900/30 p-4">
-                                    <div className="flex items-center gap-4">
-                                      <div className="flex-1">
-                                        <div className="flex items-center gap-2">
-                                          <MapPin className="w-4 h-4 text-red-600" />
-                                          <span className="text-white">{theater.name}</span>
-                                          <Badge variant="outline" className="border-gray-600 text-gray-400 text-xs">
-                                            {theater.region}
-                                          </Badge>
-                                        </div>
-                                        <div className="text-xs text-gray-400 mt-1">
-                                          현재 배포: {theater.current}개
-                                        </div>
-                                      </div>
-                                      <div className="w-32">
-                                        <Input 
-                                          type="number"
-                                          min="0"
-                                          placeholder="배포 수량"
-                                          className="bg-black border-red-900/50 text-white"
-                                        />
-                                      </div>
-                                    </div>
-                                  </Card>
-                                ))}
+                        {/* Content */}
+                        <div className="lg:col-span-9 p-6 flex flex-col h-full">
+                          {/* Header */}
+                          <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4 min-h-[80px]">
+                            <div>
+                              <h3 className="mb-1 text-white">{event.movie?.title || '영화 제목'}</h3>
+                              <p className="text-sm text-gray-400 mb-2">{event.title}</p>
+                              <div className="flex items-center gap-1 text-xs text-gray-400">
+                                <Calendar className="w-3 h-3" />
+                                {event.start_date} ~ {event.end_date}
                               </div>
-
-                              <Button className="w-full bg-red-600 hover:bg-red-700 text-white">
-                                재고 배포 완료
+                            </div>
+                            <div className="flex items-center gap-2 md:self-start">
+                              <Button size="sm" variant="outline" className="border-red-600 text-red-600 hover:bg-red-600/10">
+                                <Edit className="w-4 h-4 mr-1" />
+                                수정
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="border-red-600 text-red-600 hover:bg-red-600/10"
+                                onClick={() => handleDeleteEvent(event.event_id)}
+                              >
+                                <Trash2 className="w-4 h-4 mr-1" />
+                                삭제
                               </Button>
                             </div>
-                          </DialogContent>
-                        </Dialog>
+                          </div>
+
+                          {/* Perk Info Card */}
+                          {firstPerk && (
+                            <div className="bg-black border border-red-900/30 rounded-lg p-5 flex flex-col h-[240px]">
+                              <div className="flex items-center gap-2 mb-3">
+                                <h4 className="text-white text-lg">{firstPerk.name}</h4>
+                                <Badge variant="outline" className="border-gray-600 text-gray-400 text-xs">
+                                  {firstPerk.type}
+                                </Badge>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                                <div>
+                                  <span className="text-gray-400">참여 극장: </span>
+                                  <span className="text-white">{event.theater_count || 0}개</span>
+                                </div>
+                              </div>
+                              
+                              <StockDistributionDialog
+                                perkName={firstPerk.name}
+                                movieTitle={event.movie?.title || '영화 제목'}
+                                perkType={firstPerk.type}
+                                perkId={firstPerk.perk_id}
+                                theaters={theaters}
+                                distributionStocks={distributionStocks}
+                                onStockChange={(theaterId, stock) => {
+                                  setDistributionStocks({
+                                    ...distributionStocks,
+                                    [theaterId]: stock,
+                                  });
+                                }}
+                                onDistribute={() => {
+                                  handleDistributeStock(firstPerk.perk_id);
+                                }}
+                                trigger={
+                                  <Button 
+                                    className="w-full bg-red-600 hover:bg-red-700 text-white mt-auto"
+                                    onClick={() => setSelectedEventForDistribution(event)}
+                                  >
+                                    <MapPin className="w-4 h-4 mr-2" />
+                                    극장별 재고 배포 관리
+                                  </Button>
+                                }
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-            );
-          })
-          )}
-        </div>
+                    </Card>
+                  </motion.div>
+                );
+              })
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

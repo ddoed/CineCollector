@@ -150,29 +150,35 @@ export function Feed() {
                   <p className="text-gray-300 mb-4 whitespace-pre-line">{post.review}</p>
 
                   {/* Images */}
-                  {post.images.length > 0 && (
+                  {post.images && post.images.length > 0 && (
                     <div className="mb-4">
-                      {post.images.length === 1 ? (
-                        <div className="rounded-lg overflow-hidden border border-red-900/30">
-                          <ImageWithFallback
-                            src={post.images[0]}
-                            alt="Post image"
-                            className="w-full h-auto"
-                          />
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-2">
-                          {post.images.map((img, idx) => (
-                            <div key={idx} className="rounded-lg overflow-hidden border border-red-900/30 aspect-square">
-                              <ImageWithFallback
-                                src={img}
-                                alt={`Post image ${idx + 1}`}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      {/* 중복 제거 */}
+                      {(() => {
+                        const uniqueImages = Array.from(new Set(post.images)).filter(img => img && img.trim() !== '');
+                        if (uniqueImages.length === 0) return null;
+                        
+                        return uniqueImages.length === 1 ? (
+                          <div className="rounded-lg overflow-hidden border border-red-900/30">
+                            <ImageWithFallback
+                              src={uniqueImages[0]}
+                              alt="Post image"
+                              className="w-full h-auto"
+                            />
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2">
+                            {uniqueImages.map((img, idx) => (
+                              <div key={idx} className="rounded-lg overflow-hidden border border-red-900/30 aspect-square">
+                                <ImageWithFallback
+                                  src={img}
+                                  alt={`Post image ${idx + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
 

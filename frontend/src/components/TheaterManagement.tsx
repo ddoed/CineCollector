@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Search, Users } from 'lucide-react';
 import { Card } from './ui/card';
@@ -9,14 +9,74 @@ import { Progress } from './ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from './ui/dialog';
 import { Label } from './ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { inventoryApi, theatersApi } from '../lib/api';
 
 export function TheaterManagement() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [editStock, setEditStock] = useState(0);
+  const [editStock, setEditStock] = useState<Record<number, number>>({});
+  const [myTheater, setMyTheater] = useState<any>(null);
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [statistics, setStatistics] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedPerkForEdit, setSelectedPerkForEdit] = useState<number | null>(null);
+  const [selectedPerkForApplicants, setSelectedPerkForApplicants] = useState<number | null>(null);
+  const [applicants, setApplicants] = useState<any[]>([]);
 
-  const myTheater = 'CGV 용산아이파크몰';
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [theaterData, inventoryData, statsData] = await Promise.all([
+          theatersApi.getMyTheater(),
+          inventoryApi.getList({ movie_title: searchQuery || undefined }),
+          inventoryApi.getStatistics(),
+        ]);
+        setMyTheater(theaterData);
+        setInventory(inventoryData);
+        setStatistics(statsData);
+      } catch (err) {
+        setError((err as Error)?.message ?? '데이터를 불러오지 못했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [searchQuery]);
 
-  const inventory = [
+  useEffect(() => {
+    const fetchApplicants = async () => {
+      if (selectedPerkForApplicants) {
+        try {
+          const data = await inventoryApi.getApplicants(selectedPerkForApplicants);
+          setApplicants(data);
+        } catch (err) {
+          console.error('신청자 목록을 불러오지 못했습니다:', err);
+        }
+      }
+    };
+    fetchApplicants();
+  }, [selectedPerkForApplicants]);
+
+  const handleUpdateStock = async (perkId: number, theaterId: number) => {
+    try {
+      const stock = editStock[perkId];
+      if (stock === undefined) {
+        return;
+      }
+      await inventoryApi.updateStock(perkId, theaterId, { stock });
+      setSelectedPerkForEdit(null);
+      setEditStock({});
+      // 목록 새로고침
+      const inventoryData = await inventoryApi.getList();
+      setInventory(inventoryData);
+      alert('재고가 수정되었습니다.');
+    } catch (err) {
+      alert((err as Error)?.message || '재고 수정에 실패했습니다.');
+    }
+  };
+
+  const mockInventory = [
     {
       id: 1,
       movie: '듄: 파트2',
@@ -122,9 +182,14 @@ export function TheaterManagement() {
   };
 
   const totalItems = inventory.length;
-  const soldOutItems = inventory.filter(i => i.currentStock === 0).length;
+  const soldOutItems = inventory.filter(i => {
+    const remaining = i.remaining_stock || 0;
+    return remaining === 0;
+  }).length;
   const lowStockItems = inventory.filter(i => {
-    const percentage = getStockPercentage(i.currentStock, i.totalStock);
+    const remaining = i.remaining_stock || 0;
+    const total = i.total_stock || 1;
+    const percentage = getStockPercentage(remaining, total);
     return percentage > 0 && percentage < 30;
   }).length;
 
@@ -142,30 +207,42 @@ export function TheaterManagement() {
         </motion.div>
 
         {/* Theater Info */}
-        <Card className="bg-gray-900 border-red-900/50 p-6 mb-8">
-          <div className="flex items-center gap-3">
-            <span className="text-gray-400">담당 극장:</span>
-            <span className="text-white text-lg">{myTheater}</span>
-          </div>
-        </Card>
+        {loading ? (
+          <Card className="bg-gray-900 border-red-900/50 p-6 mb-8">
+            <div className="text-gray-400">로딩 중...</div>
+          </Card>
+        ) : error ? (
+          <Card className="bg-gray-900 border-red-900/50 p-6 mb-8">
+            <div className="text-red-500">{error}</div>
+          </Card>
+        ) : (
+          <>
+            <Card className="bg-gray-900 border-red-900/50 p-6 mb-8">
+              <div className="flex items-center gap-3">
+                <span className="text-gray-400">담당 극장:</span>
+                <span className="text-white text-lg">{myTheater?.name || '극장 정보 없음'}</span>
+              </div>
+            </Card>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card className="bg-gray-900 border-red-900/30 p-6">
-            <div className="text-sm text-gray-400 mb-1">총 특전 종류</div>
-            <div className="text-3xl text-white">{totalItems}</div>
-          </Card>
-          
-          <Card className="bg-gray-900 border-yellow-900/30 p-6">
-            <div className="text-sm text-gray-400 mb-1">소량</div>
-            <div className="text-3xl text-yellow-500">{lowStockItems}</div>
-          </Card>
-          
-          <Card className="bg-gray-900 border-gray-700 p-6">
-            <div className="text-sm text-gray-400 mb-1">소진</div>
-            <div className="text-3xl text-gray-400">{soldOutItems}</div>
-          </Card>
-        </div>
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              <Card className="bg-gray-900 border-red-900/30 p-6">
+                <div className="text-sm text-gray-400 mb-1">총 특전 종류</div>
+                <div className="text-3xl text-white">{totalItems}</div>
+              </Card>
+              
+              <Card className="bg-gray-900 border-yellow-900/30 p-6">
+                <div className="text-sm text-gray-400 mb-1">소량</div>
+                <div className="text-3xl text-yellow-500">{lowStockItems}</div>
+              </Card>
+              
+              <Card className="bg-gray-900 border-gray-700 p-6">
+                <div className="text-sm text-gray-400 mb-1">소진</div>
+                <div className="text-3xl text-gray-400">{soldOutItems}</div>
+              </Card>
+            </div>
+          </>
+        )}
 
         {/* Search */}
         <div className="relative mb-8">
@@ -179,168 +256,210 @@ export function TheaterManagement() {
         </div>
 
         {/* Inventory Table */}
-        <div className="space-y-4">
-          {inventory.map((item, index) => {
-            const stockPercentage = getStockPercentage(item.currentStock, item.totalStock);
-            const statusConfig = getStatusConfig(stockPercentage);
+        {loading ? (
+          <Card className="bg-gray-900 border-red-900/30 p-12 text-center">
+            <p className="text-gray-400">재고를 불러오는 중...</p>
+          </Card>
+        ) : error ? (
+          <Card className="bg-gray-900 border-red-900/30 p-12 text-center">
+            <p className="text-red-500">{error}</p>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {inventory.map((item, index) => {
+              const remainingStock = item.remaining_stock || 0;
+              const totalStock = item.total_stock || 1;
+              const stockPercentage = getStockPercentage(remainingStock, totalStock);
+              const statusConfig = getStatusConfig(stockPercentage);
 
-            return (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-              >
-                <Card className="bg-gray-900 border-red-900/30 p-6">
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    {/* Movie & Perk Info */}
-                    <div className="lg:col-span-4">
-                      <div>
-                        <h3 className="mb-1 text-white">{item.movie}</h3>
-                        <p className="text-sm text-gray-400 mb-2">{item.perk}</p>
-                        <div className="flex gap-2">
-                          <Badge variant="outline" className="border-red-600 text-red-600 text-xs">
-                            {item.week}주차
-                          </Badge>
-                          <Badge variant="outline" className="border-gray-600 text-gray-400 text-xs">
-                            {item.event}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Stock Progress */}
-                    <div className="lg:col-span-5">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-400">재고 현황</span>
-                          <span className={statusConfig.color}>{statusConfig.label}</span>
-                        </div>
-                        <Progress 
-                          value={stockPercentage} 
-                          className="h-3 bg-gray-800"
-                        />
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-400">
-                            잔여: <span className="text-red-500">{item.currentStock}</span>
-                          </span>
-                          <span className="text-gray-400">
-                            총: <span className="text-white">{item.totalStock}</span>
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-gray-500">
-                            기간: {item.startDate} ~ {item.endDate}
-                          </span>
-                          <span className="text-red-400 font-medium">
-                            1인당 {item.limitPerPerson}개
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="lg:col-span-3 flex flex-col gap-2 justify-center">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button className="w-full bg-red-600 hover:bg-red-700 text-white">
-                            재고 수정
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="bg-black border-2 border-red-600/50 text-white">
-                          <DialogHeader>
-                            <DialogTitle className="text-xl text-white">재고 수정</DialogTitle>
-                            <DialogDescription className="text-gray-400">
-                              현재 재고 수량을 수정합니다.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4 mt-4">
-                            <div>
-                              <Label className="text-gray-300">특전 정보</Label>
-                              <p className="text-white mt-2">{item.movie} - {item.perk}</p>
-                              <p className="text-sm text-gray-400">현재 재고: {item.currentStock}개</p>
-                              <p className="text-sm text-red-400">1인당 수령 제한: {item.limitPerPerson}개</p>
-                            </div>
-                            <div>
-                              <Label htmlFor="edit-stock" className="text-gray-300">수정할 재고 수량</Label>
-                              <Input 
-                                id="edit-stock"
-                                type="number"
-                                min="0"
-                                max={item.totalStock}
-                                placeholder={item.currentStock.toString()}
-                                value={editStock || ''}
-                                onChange={(e) => setEditStock(Number(e.target.value))}
-                                className="bg-gray-900 border-red-900/50 text-white mt-2"
-                              />
-                              <p className="text-xs text-gray-500 mt-1">
-                                0 ~ {item.totalStock} 사이의 값을 입력하세요
-                              </p>
-                            </div>
-                            <div className="flex gap-2 pt-4">
-                              <Button className="flex-1 bg-red-600 hover:bg-red-700 text-white">
-                                수정 완료
-                              </Button>
-                            </div>
+              return (
+                <motion.div
+                  key={item.perk_id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                >
+                  <Card className="bg-gray-900 border-red-900/30 p-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                      {/* Movie & Perk Info */}
+                      <div className="lg:col-span-4">
+                        <div>
+                          <h3 className="mb-1 text-white">{item.movie?.title || '영화 제목'}</h3>
+                          <p className="text-sm text-gray-400 mb-2">{item.perk_name}</p>
+                          <div className="flex gap-2">
+                            {item.week_no && (
+                              <Badge variant="outline" className="border-red-600 text-red-600 text-xs">
+                                {item.week_no}주차
+                              </Badge>
+                            )}
+                            {item.event_title && (
+                              <Badge variant="outline" className="border-gray-600 text-gray-400 text-xs">
+                                {item.event_title}
+                              </Badge>
+                            )}
                           </div>
-                        </DialogContent>
-                      </Dialog>
+                        </div>
+                      </div>
 
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" className="w-full border-red-600 text-red-600 hover:bg-red-600/10">
-                            <Users className="w-4 h-4 mr-2" />
-                            신청자 목록 ({item.applicants.length})
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="bg-black border-2 border-red-600/50 text-white max-w-3xl">
-                          <DialogHeader>
-                            <DialogTitle className="text-xl text-white">신청자 목록</DialogTitle>
-                            <DialogDescription className="text-gray-400">
-                              {item.movie} - {item.perk}
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="mt-4">
-                            <Table>
-                              <TableHeader>
-                                <TableRow className="border-red-900/30 hover:bg-transparent">
-                                  <TableHead className="text-gray-400">이름</TableHead>
-                                  <TableHead className="text-gray-400">이메일</TableHead>
-                                  <TableHead className="text-gray-400">신청일시</TableHead>
-                                  <TableHead className="text-gray-400">상태</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {item.applicants.map((applicant) => (
-                                  <TableRow key={applicant.id} className="border-red-900/30 hover:bg-red-900/10">
-                                    <TableCell className="text-white">{applicant.name}</TableCell>
-                                    <TableCell className="text-gray-400">{applicant.email}</TableCell>
-                                    <TableCell className="text-gray-400">{applicant.appliedAt}</TableCell>
-                                    <TableCell>
-                                      <Badge 
-                                        variant="outline" 
-                                        className={applicant.status === 'APPROVED' 
-                                          ? 'border-green-600 text-green-600' 
-                                          : 'border-yellow-600 text-yellow-600'
-                                        }
-                                      >
-                                        {applicant.status === 'APPROVED' ? '승인' : '대기'}
-                                      </Badge>
-                                    </TableCell>
+                      {/* Stock Progress */}
+                      <div className="lg:col-span-5">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-400">재고 현황</span>
+                            <span className={statusConfig.color}>{statusConfig.label}</span>
+                          </div>
+                          <Progress 
+                            value={stockPercentage} 
+                            className="h-3 bg-gray-800"
+                          />
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-400">
+                              잔여: <span className="text-red-500">{remainingStock}</span>
+                            </span>
+                            <span className="text-gray-400">
+                              총: <span className="text-white">{totalStock}</span>
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-500">
+                              기간: {item.start_date} ~ {item.end_date}
+                            </span>
+                            {item.limit_per_user && (
+                              <span className="text-red-400 font-medium">
+                                1인당 {item.limit_per_user}개
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="lg:col-span-3 flex flex-col gap-2 justify-center">
+                        <Dialog open={selectedPerkForEdit === item.perk_id} onOpenChange={(open) => {
+                          if (!open) setSelectedPerkForEdit(null);
+                        }}>
+                          <DialogTrigger asChild>
+                            <Button 
+                              className="w-full bg-red-600 hover:bg-red-700 text-white"
+                              onClick={() => setSelectedPerkForEdit(item.perk_id)}
+                            >
+                              재고 수정
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="bg-black border-2 border-red-600/50 text-white">
+                            <DialogHeader>
+                              <DialogTitle className="text-xl text-white">재고 수정</DialogTitle>
+                              <DialogDescription className="text-gray-400">
+                                현재 재고 수량을 수정합니다.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 mt-4">
+                              <div>
+                                <Label className="text-gray-300">특전 정보</Label>
+                                <p className="text-white mt-2">{item.movie?.title} - {item.perk_name}</p>
+                                <p className="text-sm text-gray-400">현재 재고: {remainingStock}개</p>
+                                {item.limit_per_user && (
+                                  <p className="text-sm text-red-400">1인당 수령 제한: {item.limit_per_user}개</p>
+                                )}
+                              </div>
+                              <div>
+                                <Label htmlFor="edit-stock" className="text-gray-300">수정할 재고 수량</Label>
+                                <Input 
+                                  id="edit-stock"
+                                  type="number"
+                                  min="0"
+                                  max={totalStock}
+                                  placeholder={remainingStock.toString()}
+                                  value={editStock[item.perk_id] || ''}
+                                  onChange={(e) => setEditStock({
+                                    ...editStock,
+                                    [item.perk_id]: Number(e.target.value),
+                                  })}
+                                  className="bg-gray-900 border-red-900/50 text-white mt-2"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                  0 ~ {totalStock} 사이의 값을 입력하세요
+                                </p>
+                              </div>
+                              <div className="flex gap-2 pt-4">
+                                <Button 
+                                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                                  onClick={() => {
+                                    // theaterId는 myTheater에서 가져와야 함
+                                    if (myTheater?.theater_id) {
+                                      handleUpdateStock(item.perk_id, myTheater.theater_id);
+                                    }
+                                  }}
+                                >
+                                  수정 완료
+                                </Button>
+                              </div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+
+                        <Dialog open={selectedPerkForApplicants === item.perk_id} onOpenChange={(open) => {
+                          if (!open) setSelectedPerkForApplicants(null);
+                        }}>
+                          <DialogTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              className="w-full border-red-600 text-red-600 hover:bg-red-600/10"
+                              onClick={() => setSelectedPerkForApplicants(item.perk_id)}
+                            >
+                              <Users className="w-4 h-4 mr-2" />
+                              신청자 목록 ({item.applicant_count || 0})
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="bg-black border-2 border-red-600/50 text-white max-w-3xl">
+                            <DialogHeader>
+                              <DialogTitle className="text-xl text-white">신청자 목록</DialogTitle>
+                              <DialogDescription className="text-gray-400">
+                                {item.movie?.title} - {item.perk_name}
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="mt-4">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="border-red-900/30 hover:bg-transparent">
+                                    <TableHead className="text-gray-400">이름</TableHead>
+                                    <TableHead className="text-gray-400">이메일</TableHead>
+                                    <TableHead className="text-gray-400">신청일시</TableHead>
+                                    <TableHead className="text-gray-400">수량</TableHead>
                                   </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
+                                </TableHeader>
+                                <TableBody>
+                                  {applicants.length === 0 ? (
+                                    <TableRow>
+                                      <TableCell colSpan={4} className="text-center text-gray-400">
+                                        신청자가 없습니다.
+                                      </TableCell>
+                                    </TableRow>
+                                  ) : (
+                                    applicants.map((applicant) => (
+                                      <TableRow key={applicant.user_id} className="border-red-900/30 hover:bg-red-900/10">
+                                        <TableCell className="text-white">{applicant.name}</TableCell>
+                                        <TableCell className="text-gray-400">{applicant.email}</TableCell>
+                                        <TableCell className="text-gray-400">
+                                          {new Date(applicant.applied_at).toLocaleString('ko-KR')}
+                                        </TableCell>
+                                        <TableCell className="text-gray-400">{applicant.quantity}개</TableCell>
+                                      </TableRow>
+                                    ))
+                                  )}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              </motion.div>
-            );
-          })}
-        </div>
+                  </Card>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

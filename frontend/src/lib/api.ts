@@ -219,10 +219,13 @@ export interface ViewingRecordResponse {
 
 export interface ViewingRecordCreateRequest {
   movie_id: number;
-  viewing_date: string;
+  view_date: string;
+  theater_id: number;
   rating?: number;
   review?: string;
-  theater_id?: number;
+  is_public?: boolean;
+  image_urls?: string[];
+  perk_ids?: number[];
 }
 
 export interface ViewingRecordUpdateRequest {

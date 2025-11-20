@@ -168,6 +168,7 @@ public class EventService {
                 .startDate(event.getStartDate())
                 .endDate(event.getEndDate())
                 .weekNo(event.getWeekNo())
+                .image(event.getImage()) // 이벤트 이미지
                 .perks(perkDetails)
                 .build();
     }
