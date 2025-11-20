@@ -1,5 +1,7 @@
 # CineCollector
-
+> **⚠️ 교육 목적 프로젝트**  
+> 이 프로젝트는 **데이터베이스 과목 텀프로젝트**로서 **교육 및 학습 목적**으로만 제작되었습니다.  
+> 상업적 목적이 아니며, 실제 서비스로 운영되지 않습니다.
 <img width="2531" height="1391" alt="CineCollector 메인 화면" src="https://github.com/user-attachments/assets/c0b94934-5b58-48b4-930b-eb936d651ebc" />
 
 CineCollector는 영화 팬덤 문화를 기반으로 **굿즈(특전) 수집, 이벤트 참여, 관람 기록 관리**를 한 곳에서 해결하는 플랫폼입니다.  
