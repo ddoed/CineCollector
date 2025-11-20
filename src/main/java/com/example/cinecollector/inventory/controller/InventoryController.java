@@ -5,6 +5,7 @@ import com.example.cinecollector.common.security.CustomUserDetails;
 import com.example.cinecollector.inventory.dto.InventoryCreateRequestDto;
 import com.example.cinecollector.inventory.dto.InventoryResponseDto;
 import com.example.cinecollector.inventory.dto.InventoryUpdateRequestDto;
+import com.example.cinecollector.inventory.dto.TheaterSelectionDto;
 import com.example.cinecollector.inventory.service.InventoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,30 @@ public class InventoryController {
         Long userId = userDetails.getUser().getUserId();
         inventoryService.deleteInventory(userId, perkId);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @PostMapping("/theaters")
+    public ResponseEntity<ApiResponse<Void>> selectTheaters(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody TheaterSelectionDto dto
+    ) {
+        Long userId = userDetails.getUser().getUserId();
+        inventoryService.selectTheaters(userId, dto.getPerkId(), dto.getTheaterIds());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @PatchMapping("/{perkId}/theaters/{theaterId}")
+    public ResponseEntity<ApiResponse<InventoryResponseDto>> updateStock(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long perkId,
+            @PathVariable Long theaterId,
+            @RequestBody InventoryUpdateRequestDto dto
+    ) {
+        Long userId = userDetails.getUser().getUserId();
+        InventoryResponseDto response = inventoryService.updateStock(
+                userId, perkId, theaterId, dto.getStock(), dto.getStatus()
+        );
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }
 

@@ -2,9 +2,7 @@ package com.example.cinecollector.event.controller;
 
 import com.example.cinecollector.common.response.ApiResponse;
 import com.example.cinecollector.common.security.CustomUserDetails;
-import com.example.cinecollector.event.dto.EventCreateRequestDto;
-import com.example.cinecollector.event.dto.EventResponseDto;
-import com.example.cinecollector.event.dto.EventUpdateRequestDto;
+import com.example.cinecollector.event.dto.*;
 import com.example.cinecollector.event.service.EventService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -36,9 +34,24 @@ public class EventController {
         return ResponseEntity.ok(ApiResponse.success(eventService.getAllEvent()));
     }
 
+    @GetMapping("/list")
+    public ResponseEntity<ApiResponse<List<EventListDto>>> getEventList(
+            @RequestParam(required = false, defaultValue = "전체") String status,
+            @RequestParam(required = false) String movieTitle
+    ) {
+        List<EventListDto> list = eventService.getEventList(status, movieTitle);
+        return ResponseEntity.ok(ApiResponse.success(list));
+    }
+
     @GetMapping("/{eventId}")
     public ResponseEntity<ApiResponse<EventResponseDto>> getEvent(@PathVariable Long eventId) {
         return ResponseEntity.ok(ApiResponse.success(eventService.getEvent(eventId)));
+    }
+
+    @GetMapping("/{eventId}/detail")
+    public ResponseEntity<ApiResponse<EventDetailDto>> getEventDetail(@PathVariable Long eventId) {
+        EventDetailDto detail = eventService.getEventDetail(eventId);
+        return ResponseEntity.ok(ApiResponse.success(detail));
     }
 
     @PatchMapping("/{eventId}")

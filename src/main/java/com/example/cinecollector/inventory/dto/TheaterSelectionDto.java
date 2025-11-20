@@ -1,22 +1,20 @@
 package com.example.cinecollector.inventory.dto;
 
-import com.example.cinecollector.inventory.entity.PerkStatus;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 
-@Getter
-public class InventoryCreateRequestDto {
+import java.util.List;
 
-    @NotNull
-    @JsonProperty("theater_id")
-    private Long theaterId;
+@Getter
+public class TheaterSelectionDto {
 
     @NotNull
     @JsonProperty("perk_id")
     private Long perkId;
 
-    private Integer stock;
-
-    private PerkStatus status;
+    @NotNull
+    @JsonProperty("theater_ids")
+    private List<Long> theaterIds;
 }
+

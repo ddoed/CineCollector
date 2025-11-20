@@ -69,5 +69,10 @@ public class InventoryRepository {
         String sql = "SELECT * FROM inventories WHERE perk_id = ?";
         return jdbcTemplate.query(sql, rowMapper, perkId).stream().findFirst();
     }
+
+    public List<Inventory> findAllByPerkId(Long perkId) {
+        String sql = "SELECT * FROM inventories WHERE perk_id = ? ORDER BY theater_id";
+        return jdbcTemplate.query(sql, rowMapper, perkId);
+    }
 }
 

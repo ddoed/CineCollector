@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS viewing_records (
     view_date   DATE,
     review      TEXT,
     is_public   BOOLEAN DEFAULT FALSE,
-    created_at  TIMESTAMP,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     rating      FLOAT,
 
     CONSTRAINT fk_viewing_user

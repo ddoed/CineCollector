@@ -41,6 +41,7 @@ public enum ErrorCode {
 
     // 특전 재고
     INVENTORY_NOT_FOUND(404, "INVENTORY-001" , "해당 재고를 찾을 수 없습니다." ),
+    INVENTORY_ALREADY_EXISTS(400, "INVENTORY-002" , "이미 등록된 지점입니다." ),
 
     // 도감
     COLLECTION_NOT_FOUND(404, "COLLECTION-001" , "도감을 찾을 수 없습니다." ),

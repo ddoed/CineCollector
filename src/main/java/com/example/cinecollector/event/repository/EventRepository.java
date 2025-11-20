@@ -6,6 +6,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -69,6 +70,55 @@ public class EventRepository {
     public List<Event> findAll() {
         String sql = "SELECT * FROM events ORDER BY event_id DESC";
         return jdbcTemplate.query(sql, rowMapper);
+    }
+
+    public List<Event> findAllWithFilters(String status, String movieTitle) {
+        StringBuilder sql = new StringBuilder("""
+            SELECT e.*
+            FROM events e
+            JOIN movies m ON e.movie_id = m.movie_id
+            WHERE 1=1
+        """);
+
+        if (status != null && !status.isEmpty() && !status.equals("전체")) {
+            switch (status) {
+                case "진행 중" -> sql.append(" AND e.start_date <= ? AND e.end_date >= ?");
+                case "예정" -> sql.append(" AND e.start_date > ?");
+                case "종료" -> sql.append(" AND e.end_date < ?");
+            }
+        }
+
+        if (movieTitle != null && !movieTitle.trim().isEmpty()) {
+            sql.append(" AND m.title ILIKE ?");
+        }
+
+        sql.append(" ORDER BY e.start_date DESC, e.event_id DESC");
+
+        if (status != null && !status.isEmpty() && !status.equals("전체")) {
+            LocalDate today = LocalDate.now();
+            if (status.equals("진행 중")) {
+                if (movieTitle != null && !movieTitle.trim().isEmpty()) {
+                    return jdbcTemplate.query(sql.toString(), rowMapper, today, today, "%" + movieTitle + "%");
+                }
+                return jdbcTemplate.query(sql.toString(), rowMapper, today, today);
+            } else if (status.equals("예정")) {
+                if (movieTitle != null && !movieTitle.trim().isEmpty()) {
+                    return jdbcTemplate.query(sql.toString(), rowMapper, today, "%" + movieTitle + "%");
+                }
+                return jdbcTemplate.query(sql.toString(), rowMapper, today);
+            } else if (status.equals("종료")) {
+                if (movieTitle != null && !movieTitle.trim().isEmpty()) {
+                    return jdbcTemplate.query(sql.toString(), rowMapper, today, "%" + movieTitle + "%");
+                }
+                return jdbcTemplate.query(sql.toString(), rowMapper, today);
+            }
+        }
+
+        if (movieTitle != null && !movieTitle.trim().isEmpty()) {
+            return jdbcTemplate.query(sql.toString(), rowMapper, "%" + movieTitle + "%");
+        }
+
+        return jdbcTemplate.query(sql.toString(), rowMapper);
     }
 }
 
