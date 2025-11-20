@@ -24,6 +24,7 @@ public class MovieRepository {
                             rs.getDate("release_date").toLocalDate() : null)
                     .genre(rs.getString("genre"))
                     .duration(rs.getInt("duration"))
+                    .image(rs.getString("image"))
                     .build();
 
     public Movie save(Movie movie) {

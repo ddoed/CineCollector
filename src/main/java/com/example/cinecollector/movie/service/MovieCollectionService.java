@@ -152,4 +152,67 @@ public class MovieCollectionService {
         return result;
     }
 
+    public PerkCollectionStatisticsDto getPerkCollectionStatistics(Long userId) {
+        Map<String, Object> stats = repository.getPerkCollectionStatistics(userId);
+
+        Integer totalPerks = ((Number) stats.get("total_perks")).intValue();
+        Integer collectedPerks = ((Number) stats.get("collected_perks")).intValue();
+
+        Double collectionRate = 0.0;
+        if (totalPerks > 0) {
+            collectionRate = (double) collectedPerks / totalPerks * 100;
+            collectionRate = Math.round(collectionRate * 10.0) / 10.0;
+        }
+
+        return PerkCollectionStatisticsDto.builder()
+                .totalPerks(totalPerks)
+                .collectedPerks(collectedPerks)
+                .collectionRate(collectionRate)
+                .overallProgress(collectionRate)
+                .build();
+    }
+
+    public List<PerkCollectionListDto> getPerkCollectionList(Long userId, String movieTitle, String filter) {
+        List<Map<String, Object>> movieList = repository.findPerkCollectionList(userId, movieTitle, filter);
+
+        return movieList.stream()
+                .map(movie -> {
+                    Long movieId = ((Number) movie.get("movie_id")).longValue();
+                    String title = (String) movie.get("movie_title");
+                    String movieImage = (String) movie.get("movie_image");
+                    Integer totalCount = ((Number) movie.get("total_count")).intValue();
+                    Integer collectedCount = ((Number) movie.get("collected_count")).intValue();
+
+                    Double completionRate = 0.0;
+                    if (totalCount > 0) {
+                        completionRate = (double) collectedCount / totalCount * 100;
+                        completionRate = Math.round(completionRate * 10.0) / 10.0;
+                    }
+
+                    // 해당 영화의 특전 목록 조회
+                    List<Map<String, Object>> perkRows = repository.findPerksByMovieId(userId, movieId);
+                    List<PerkCollectionListDto.PerkCollectionItemDto> perks = perkRows.stream()
+                            .map(perk -> PerkCollectionListDto.PerkCollectionItemDto.builder()
+                                    .perkId(((Number) perk.get("perk_id")).longValue())
+                                    .weekNo((Integer) perk.get("week_no"))
+                                    .name((String) perk.get("name"))
+                                    .type((String) perk.get("type"))
+                                    .image((String) perk.get("image"))
+                                    .collected((Boolean) perk.get("collected"))
+                                    .build())
+                            .collect(Collectors.toList());
+
+                    return PerkCollectionListDto.builder()
+                            .movieId(movieId)
+                            .movieTitle(title)
+                            .movieImage(movieImage)
+                            .collectedCount(collectedCount)
+                            .totalCount(totalCount)
+                            .completionRate(completionRate)
+                            .perks(perks)
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
 }

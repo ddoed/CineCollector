@@ -24,6 +24,7 @@ public class PerkRepository {
                     .limitPerUser(rs.getObject("limit_per_user", Integer.class))
                     .quantity(rs.getObject("quantity", Integer.class))
                     .description(rs.getString("description"))
+                    .image(rs.getString("image"))
                     .build();
 
     public Perk save(Perk perk) {

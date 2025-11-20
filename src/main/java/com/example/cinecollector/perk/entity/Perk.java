@@ -13,5 +13,6 @@ public class Perk {
     private Integer limitPerUser;
     private Integer quantity;
     private String description;
+    private String image;
 }
 

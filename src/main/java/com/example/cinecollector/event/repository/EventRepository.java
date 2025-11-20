@@ -25,6 +25,7 @@ public class EventRepository {
                     .startDate(rs.getObject("start_date", java.time.LocalDate.class))
                     .endDate(rs.getObject("end_date", java.time.LocalDate.class))
                     .weekNo(rs.getObject("week_no", Integer.class))
+                    .image(rs.getString("image"))
                     .build();
 
     public Event save(Event e) {

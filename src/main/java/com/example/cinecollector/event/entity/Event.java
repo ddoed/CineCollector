@@ -15,4 +15,5 @@ public class Event {
     private LocalDate startDate;
     private LocalDate endDate;
     private Integer weekNo;
+    private String image;
 }

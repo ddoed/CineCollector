@@ -22,7 +22,8 @@ public class PerkController {
     private final PerkService perkService;
 
     @PostMapping
-    public ResponseEntity<ApiResponse<PerkResponseDto>> createPerk(
+    public ResponseEntity<ApiResponse
+            <PerkResponseDto>> createPerk(
             @AuthenticationPrincipal CustomUserDetails user,
             @Valid @RequestBody PerkCreateRequestDto dto
     ) {

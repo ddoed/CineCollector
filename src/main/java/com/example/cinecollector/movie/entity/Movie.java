@@ -17,5 +17,6 @@ public class Movie {
     private LocalDate releaseDate;
     private String genre;
     private Integer duration;
+    private String image;
 }
 
