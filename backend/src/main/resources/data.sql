@@ -296,10 +296,28 @@ VALUES (1, 1, CURRENT_DATE, 1);
 INSERT INTO viewing_records (user_id, movie_id, theater_id, view_date, review, is_public, rating, created_at)
 VALUES (1, 1, 1, '2024-03-05', '압도적인 스케일과 영상미에 완전히 빠져들었습니다.', true, 4.8, CURRENT_TIMESTAMP);
 
+INSERT INTO viewing_records (user_id, movie_id, theater_id, view_date, review, is_public, rating, created_at)
+VALUES (2, 4, 1, '2025-10-31', '예쁜데 창문이 반투명이라 아쉽네요..', true, 4.5, CURRENT_TIMESTAMP);
+
+INSERT INTO viewing_records (user_id, movie_id, theater_id, view_date, review, is_public, rating, created_at)
+VALUES (3, 5, 1, '2025-11-22', '포스터가 너무 예뻐요..! 마지막 특전이라 그런지 수량을 적게 풀었네요ㅠ', true, 5.0, CURRENT_TIMESTAMP);
+
 -- Viewing Record Images 예시 데이터 (record_id는 viewing_records의 record_id 참조)
+
 INSERT INTO viewingrecord_image (record_id, image_url)
-VALUES (1, 'https://example.com/image1.jpg');
+VALUES (2, 'https://comtogether.s3.ap-southeast-2.amazonaws.com/string/%EC%B9%B4%ED%8E%98%ED%8F%AC.jpg');
+
+INSERT INTO viewingrecord_image (record_id, image_url)
+VALUES (3, 'https://comtogether.s3.ap-southeast-2.amazonaws.com/string/%EC%85%94%ED%8F%AC2.jpg');
+INSERT INTO viewingrecord_image (record_id, image_url)
+VALUES (3, 'https://comtogether.s3.ap-southeast-2.amazonaws.com/string/%EC%85%94%ED%8F%AC.jpg');
+
 
 -- Viewing Record Perks 예시 데이터 (record_id는 viewing_records의 record_id, perk_id는 perks의 perk_id 참조)
 INSERT INTO viewing_record_perk (record_id, perk_id)
 VALUES (1, 1);
+
+INSERT INTO viewing_record_perk (record_id, perk_id)
+VALUES (3, 6);
+
+

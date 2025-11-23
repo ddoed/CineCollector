@@ -12,16 +12,17 @@ export function ImageWithFallback(props: React.ImgHTMLAttributes<HTMLImageElemen
 
   const { src, alt, style, className, ...rest } = props
 
-  return didError ? (
-    <div
-      className={`inline-block bg-gray-100 text-center align-middle ${className ?? ''}`}
-      style={style}
-    >
-      <div className="flex items-center justify-center w-full h-full">
-        <img src={ERROR_IMG_SRC} alt="Error loading image" {...rest} data-original-url={src} />
-      </div>
-    </div>
-  ) : (
+  // 빈 src나 유효하지 않은 src는 렌더링하지 않음
+  if (!src || (typeof src === 'string' && src.trim() === '')) {
+    return null
+  }
+
+  // 에러가 발생했을 때도 아무것도 렌더링하지 않음
+  if (didError) {
+    return null
+  }
+
+  return (
     <img src={src} alt={alt} className={className} style={style} {...rest} onError={handleError} />
   )
 }

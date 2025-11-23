@@ -150,37 +150,54 @@ export function Feed() {
                   <p className="text-gray-300 mb-4 whitespace-pre-line">{post.review}</p>
 
                   {/* Images */}
-                  {post.images && post.images.length > 0 && (
-                    <div className="mb-4">
-                      {/* 중복 제거 */}
-                      {(() => {
-                        const uniqueImages = Array.from(new Set(post.images)).filter(img => img && img.trim() !== '');
-                        if (uniqueImages.length === 0) return null;
-                        
-                        return uniqueImages.length === 1 ? (
-                          <div className="rounded-lg overflow-hidden border border-red-900/30">
+                  {(() => {
+                    // 유효한 이미지만 필터링 (null, undefined, 빈 문자열 제거)
+                    const validImages = (post.images || [])
+                      .filter(img => img && typeof img === 'string' && img.trim() !== '')
+                      .filter((img, index, self) => self.indexOf(img) === index); // 중복 제거
+                    
+                    // 유효한 이미지가 없으면 렌더링하지 않음
+                    if (validImages.length === 0) return null;
+                    
+                    // 단일 이미지인 경우
+                    if (validImages.length === 1) {
+                      const img = validImages[0];
+                      if (!img || (typeof img === 'string' && img.trim() === '')) {
+                        return null;
+                      }
+                      return (
+                        <div className="mb-4">
+                          <ImageWithFallback
+                            src={img}
+                            alt="Post image"
+                            className="w-full h-auto rounded-lg border border-red-900/30"
+                          />
+                        </div>
+                      );
+                    }
+                    
+                    // 여러 이미지인 경우 - 실제로 렌더링될 이미지만 필터링
+                    const renderableImages = validImages.filter(
+                      img => img && typeof img === 'string' && img.trim() !== ''
+                    );
+                    
+                    if (renderableImages.length === 0) return null;
+                    
+                    return (
+                      <div className="mb-4">
+                        <div className="grid grid-cols-2 gap-2">
+                          {renderableImages.map((img, idx) => (
                             <ImageWithFallback
-                              src={uniqueImages[0]}
-                              alt="Post image"
-                              className="w-full h-auto"
+                              key={idx}
+                              src={img}
+                              alt={`Post image ${idx + 1}`}
+                              className="w-full aspect-square object-cover rounded-lg border border-red-900/30"
                             />
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-2 gap-2">
-                            {uniqueImages.map((img, idx) => (
-                              <div key={idx} className="rounded-lg overflow-hidden border border-red-900/30 aspect-square">
-                                <ImageWithFallback
-                                  src={img}
-                                  alt={`Post image ${idx + 1}`}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Perks */}
                   {post.perks && post.perks.length > 0 && (

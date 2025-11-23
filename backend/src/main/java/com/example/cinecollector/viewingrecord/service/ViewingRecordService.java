@@ -165,9 +165,10 @@ public class ViewingRecordService {
         Theater theater = theaterRepository.findById(record.getTheaterId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.THEATER_NOT_FOUND));
 
-        // 관람기록 이미지들 조회
+        // 관람기록 이미지들 조회 (빈 문자열이나 null 제거)
         List<String> images = viewingRecordImageRepository.findAllByRecordId(record.getRecordId()).stream()
                 .map(ViewingRecordImage::getImageUrl)
+                .filter(url -> url != null && !url.trim().isEmpty())
                 .collect(Collectors.toList());
 
         // 수집한 특전 목록 조회
