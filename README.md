@@ -24,7 +24,10 @@ CineCollector는 이러한 활동을 구조적으로 기록하고 공유하는 *
 
 홈 화면에서 다른 사용자들이 공개한 관람 기록을 확인할 수 있습니다. 영화 포스터, 평점, 후기, 수집한 특전 정보를 한눈에 볼 수 있으며, 사용자 간 영화 관람 경험을 공유할 수 있습니다.
 
-<img width="2532" height="1391" alt="홈 화면 - 관람 기록 피드" src="https://github.com/user-attachments/assets/6260440d-5902-4979-a6d2-798add7b5c58" />
+<img width="2533" height="1396" alt="image" src="https://github.com/user-attachments/assets/cf6d74d0-29f2-43bc-b87c-1dfb70f78ba9" />
+<img width="2533" height="1389" alt="image" src="https://github.com/user-attachments/assets/baa431fa-41bc-4c4a-b91c-6db73b776bd0" />
+
+
 
 #### 2. 이벤트/특전 확인
 
