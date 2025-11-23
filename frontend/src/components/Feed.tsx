@@ -8,6 +8,46 @@ import { Badge } from './ui/badge';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { apiRequest } from '../lib/api';
 
+// 이미지가 실제로 로드되었을 때만 렌더링하는 컨테이너
+function ImageContainer({ imageUrl, children, className }: { imageUrl: string; children: React.ReactNode; className?: string }) {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    // 초기화
+    setImageLoaded(false);
+    setImageError(false);
+
+    if (!imageUrl || (typeof imageUrl === 'string' && imageUrl.trim() === '')) {
+      setImageError(true);
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      setImageLoaded(true);
+      setImageError(false);
+    };
+    img.onerror = () => {
+      setImageError(true);
+      setImageLoaded(false);
+    };
+    img.src = imageUrl;
+  }, [imageUrl]);
+
+  // 이미지가 없거나 에러가 발생하면 렌더링하지 않음 (부모 div도 포함)
+  if (!imageUrl || (typeof imageUrl === 'string' && imageUrl.trim() === '') || imageError) {
+    return null;
+  }
+
+  // 이미지가 로드되기 전에는 렌더링하지 않음 (테두리가 보이지 않도록)
+  if (!imageLoaded) {
+    return null;
+  }
+
+  return <div className={className}>{children}</div>;
+}
+
 interface HomeViewingRecord {
   record_id: number;
   user: {
@@ -166,13 +206,13 @@ export function Feed() {
                         return null;
                       }
                       return (
-                        <div className="mb-4">
+                        <ImageContainer imageUrl={img} className="mb-4">
                           <ImageWithFallback
                             src={img}
-                            alt="Post image"
+                            alt=""
                             className="w-full h-auto rounded-lg border border-red-900/30"
                           />
-                        </div>
+                        </ImageContainer>
                       );
                     }
                     
@@ -183,16 +223,38 @@ export function Feed() {
                     
                     if (renderableImages.length === 0) return null;
                     
+                    // 실제로 로드 가능한 이미지만 필터링
+                    const loadedImages = renderableImages.filter(img => {
+                      // 이미지가 유효한 URL인지 간단히 확인
+                      try {
+                        new URL(img);
+                        return true;
+                      } catch {
+                        return false;
+                      }
+                    });
+
+                    if (loadedImages.length === 0) return null;
+
+                    // 실제로 렌더링될 이미지만 필터링 (ImageContainer가 null을 반환하지 않는 것만)
+                    const renderedImages = loadedImages.filter(img => {
+                      // 간단한 유효성 검사
+                      return img && typeof img === 'string' && img.trim() !== '';
+                    });
+
+                    if (renderedImages.length === 0) return null;
+
                     return (
                       <div className="mb-4">
                         <div className="grid grid-cols-2 gap-2">
-                          {renderableImages.map((img, idx) => (
-                            <ImageWithFallback
-                              key={idx}
-                              src={img}
-                              alt={`Post image ${idx + 1}`}
-                              className="w-full aspect-square object-cover rounded-lg border border-red-900/30"
-                            />
+                          {renderedImages.map((img, idx) => (
+                            <ImageContainer key={idx} imageUrl={img}>
+                              <ImageWithFallback
+                                src={img}
+                                alt=""
+                                className="w-full aspect-square object-cover rounded-lg border border-red-900/30"
+                              />
+                            </ImageContainer>
                           ))}
                         </div>
                       </div>
