@@ -1,7 +1,5 @@
 package com.example.cinecollector.perkapplication.service;
 
-import com.example.cinecollector.collection.entity.Collection;
-import com.example.cinecollector.collection.repository.CollectionRepository;
 import com.example.cinecollector.common.exception.BusinessException;
 import com.example.cinecollector.common.exception.ErrorCode;
 import com.example.cinecollector.inventory.entity.Inventory;
@@ -11,12 +9,12 @@ import com.example.cinecollector.perk.entity.Perk;
 import com.example.cinecollector.perk.repository.PerkRepository;
 import com.example.cinecollector.perkapplication.dto.PerkApplicationRequestDto;
 import com.example.cinecollector.perkapplication.dto.PerkApplicationResponseDto;
+import com.example.cinecollector.perkapplication.entity.PerkApplication;
+import com.example.cinecollector.perkapplication.repository.PerkApplicationRepository;
 import com.example.cinecollector.theater.repository.TheaterRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDate;
 
 @Service
 @RequiredArgsConstructor
@@ -25,7 +23,7 @@ public class PerkApplicationService {
     private final PerkRepository perkRepository;
     private final TheaterRepository theaterRepository;
     private final InventoryRepository inventoryRepository;
-    private final CollectionRepository collectionRepository;
+    private final PerkApplicationRepository perkApplicationRepository;
 
     @Transactional
     public PerkApplicationResponseDto applyPerk(Long userId, PerkApplicationRequestDto dto) {
@@ -53,11 +51,8 @@ public class PerkApplicationService {
 
         // 1인당 제한 수량 확인
         if (perk.getLimitPerUser() != null) {
-            // 사용자가 이미 신청한 수량 확인
-            Collection existingCollection = collectionRepository.findById(userId, dto.getPerkId())
-                    .orElse(null);
-
-            int currentQuantity = existingCollection != null ? existingCollection.getQuantity() : 0;
+            // 사용자가 이미 신청한 수량 확인 (perk_applications에서 확인)
+            int currentQuantity = perkApplicationRepository.countByUserIdAndPerkId(userId, dto.getPerkId());
             int requestedQuantity = dto.getQuantity();
             int totalQuantity = currentQuantity + requestedQuantity;
 
@@ -78,39 +73,24 @@ public class PerkApplicationService {
                 .build();
         inventoryRepository.update(updatedInventory);
 
-        // Collection에 추가 또는 업데이트
-        Collection existingCollection = collectionRepository.findById(userId, dto.getPerkId())
-                .orElse(null);
+        // PerkApplication에 신청 기록 저장 (is_obtained는 false - 아직 수령 안 함)
+        PerkApplication newApplication = PerkApplication.builder()
+                .userId(userId)
+                .perkId(dto.getPerkId())
+                .theaterId(dto.getTheaterId())
+                .quantity(dto.getQuantity())
+                .isObtained(false)  // 수령 시점에 true로 업데이트
+                .build();
 
-        Collection savedCollection;
-        if (existingCollection != null) {
-            // 기존 수량에 추가
-            Collection updatedCollection = Collection.builder()
-                    .userId(userId)
-                    .perkId(dto.getPerkId())
-                    .quantity(existingCollection.getQuantity() + dto.getQuantity())
-                    .obtainedDate(existingCollection.getObtainedDate() != null
-                            ? existingCollection.getObtainedDate()
-                            : LocalDate.now())
-                    .build();
-            savedCollection = collectionRepository.update(updatedCollection);
-        } else {
-            // 새로 생성
-            Collection newCollection = Collection.builder()
-                    .userId(userId)
-                    .perkId(dto.getPerkId())
-                    .quantity(dto.getQuantity())
-                    .obtainedDate(LocalDate.now())
-                    .build();
-            savedCollection = collectionRepository.save(newCollection);
-        }
+        PerkApplication savedApplication = perkApplicationRepository.save(newApplication);
 
         return PerkApplicationResponseDto.builder()
-                .userId(savedCollection.getUserId())
-                .perkId(savedCollection.getPerkId())
-                .theaterId(dto.getTheaterId())
-                .quantity(savedCollection.getQuantity())
-                .obtainedDate(savedCollection.getObtainedDate())
+                .applicationId(savedApplication.getApplicationId())
+                .userId(savedApplication.getUserId())
+                .perkId(savedApplication.getPerkId())
+                .theaterId(savedApplication.getTheaterId())
+                .quantity(savedApplication.getQuantity())
+                .isObtained(savedApplication.getIsObtained())
                 .build();
     }
 

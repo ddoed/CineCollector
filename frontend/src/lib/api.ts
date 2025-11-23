@@ -324,8 +324,7 @@ export interface PerkApplicationResponse {
   perk_id: number;
   theater_id: number;
   quantity: number;
-  status: string;
-  applied_at: string;
+  is_obtained: boolean;
 }
 
 export interface PresignedUrlRequest {
