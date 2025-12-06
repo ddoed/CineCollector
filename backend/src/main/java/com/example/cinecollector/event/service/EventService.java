@@ -99,8 +99,8 @@ public class EventService {
     }
 
     @Transactional(readOnly = true)
-    public List<EventListDto> getEventList(String status, String movieTitle) {
-        List<Event> events = eventRepository.findAllWithFilters(status, movieTitle);
+    public List<EventListDto> getEventList(String status, String movieTitle, String eventTitle) {
+        List<Event> events = eventRepository.findAllWithFilters(status, movieTitle, eventTitle);
 
         return events.stream()
                 .map(this::convertToEventListDto)
@@ -149,6 +149,8 @@ public class EventService {
                             .type(perk.getType())
                             .description(perk.getDescription())
                             .limitPerUser(perk.getLimitPerUser())
+                            .quantity(perk.getQuantity())
+                            .image(perk.getImage())
                             .theaters(theaters)
                             .build();
                 })

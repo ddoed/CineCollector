@@ -37,17 +37,45 @@ export function CollectionGallery() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statistics, setStatistics] = useState<{ total_perks: number; collected_perks: number; collection_rate: number } | null>(null);
+  const [statisticsLoading, setStatisticsLoading] = useState(true);
 
+  // 통계 가져오기 함수
+  const fetchStatistics = async () => {
+    try {
+      setStatisticsLoading(true);
+      const statsData = await movieCollectionsApi.getPerkCollectionStatistics();
+      setStatistics(statsData);
+    } catch (err) {
+      // 통계 로딩 실패는 무시 (목록 로딩과 별개)
+    } finally {
+      setStatisticsLoading(false);
+    }
+  };
+
+  // 통계는 초기 로드 시에만 가져오기 (검색과 무관)
+  useEffect(() => {
+    fetchStatistics();
+  }, []);
+
+  // 목록은 검색/필터 조건에 따라 가져오기
   useEffect(() => {
     const fetchCollections = async () => {
       try {
         setLoading(true);
-        const [listData, statsData] = await Promise.all([
-          movieCollectionsApi.getPerkCollectionList({ movie_title: searchQuery || undefined, filter: filterType === 'all' ? '전체' : filterType === 'collected' ? '수집 완료' : '미수집' }),
-          movieCollectionsApi.getPerkCollectionStatistics(),
-        ]);
+        const trimmedQuery = searchQuery.trim();
+        // 검색어가 있을 때만 movie_title 파라미터에 추가 (이벤트 페이지 방식)
+        const params: { movie_title?: string; filter?: string } = {};
+        if (trimmedQuery) {
+          params.movie_title = trimmedQuery;
+        }
+        // filter는 항상 전달 (기본값 "전체")
+        const filterValue = filterType === 'all' ? '전체' : filterType === 'collected' ? '수집 완료' : '미수집';
+        if (filterValue !== '전체') {
+          params.filter = filterValue;
+        }
+        
+        const listData = await movieCollectionsApi.getPerkCollectionList(params);
         setPerksByMovie(listData);
-        setStatistics(statsData);
       } catch (err) {
         setError((err as Error)?.message ?? '컬렉션을 불러오지 못했습니다.');
       } finally {
@@ -57,11 +85,12 @@ export function CollectionGallery() {
     fetchCollections();
   }, [searchQuery, filterType]);
 
-  const getTotalPerks = () => statistics?.total_perks || perksByMovie.reduce((sum, movie) => sum + movie.total_count, 0);
-  const getCollectedPerks = () => statistics?.collected_perks || perksByMovie.reduce((sum, movie) => sum + movie.collected_count, 0);
+  // 통계는 항상 전체 기준 (검색 결과와 무관)
+  const getTotalPerks = () => statistics?.total_perks || 0;
+  const getCollectedPerks = () => statistics?.collected_perks || 0;
   const collectionRate = statistics?.collection_rate 
     ? Math.round(statistics.collection_rate) 
-    : (getTotalPerks() > 0 ? Math.round((getCollectedPerks() / getTotalPerks()) * 100) : 0);
+    : 0;
 
   const togglePerkCollection = async (movieId: number, perkId: number) => {
     try {
@@ -94,6 +123,9 @@ export function CollectionGallery() {
         }
         return movie;
       }));
+
+      // 통계 다시 가져오기
+      await fetchStatistics();
     } catch (err) {
       alert((err as Error)?.message || '컬렉션 업데이트에 실패했습니다.');
     }
@@ -114,6 +146,9 @@ export function CollectionGallery() {
         // 목록에서 제거
         setPerksByMovie(prev => prev.filter(m => m.movie_id !== movieId));
         setEditingMovie(null);
+
+        // 통계 다시 가져오기
+        await fetchStatistics();
       }
     } catch (err) {
       alert((err as Error)?.message || '삭제에 실패했습니다.');
@@ -139,34 +174,36 @@ export function CollectionGallery() {
         </motion.div>
 
         {/* Stats Cards */}
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <Card className="bg-black border-2 border-red-900/50 p-6 shadow-lg">
-              <div className="text-sm text-gray-400 mb-2">로딩 중...</div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          {error ? (
+            <Card className="bg-black border-2 border-red-900/50 p-6 col-span-3">
+              <div className="text-red-500">{error}</div>
             </Card>
-          </div>
-        ) : error ? (
-          <Card className="bg-black border-2 border-red-900/50 p-6 mb-8">
-            <div className="text-red-500">{error}</div>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <Card className="bg-black border-2 border-red-900/50 p-6 shadow-lg">
-              <div className="text-sm text-gray-400 mb-2">총 특전</div>
-              <div className="text-3xl text-white">{getTotalPerks()}</div>
-            </Card>
-            
-            <Card className="bg-black border-2 border-red-900/50 p-6 shadow-lg">
-              <div className="text-sm text-gray-400 mb-2">수집 완료</div>
-              <div className="text-3xl text-white">{getCollectedPerks()}</div>
-            </Card>
-            
-            <Card className="bg-black border-2 border-red-900/50 p-6 shadow-lg">
-              <div className="text-sm text-gray-400 mb-2">수집률</div>
-              <div className="text-3xl text-white">{collectionRate}%</div>
-            </Card>
-          </div>
-        )}
+          ) : (
+            <>
+              <Card className="bg-black border-2 border-red-900/50 p-6 shadow-lg">
+                <div className="text-sm text-gray-400 mb-2">총 특전</div>
+                <div className="text-3xl text-white">
+                  {statisticsLoading ? '...' : getTotalPerks()}
+                </div>
+              </Card>
+              
+              <Card className="bg-black border-2 border-red-900/50 p-6 shadow-lg">
+                <div className="text-sm text-gray-400 mb-2">수집 완료</div>
+                <div className="text-3xl text-white">
+                  {statisticsLoading ? '...' : getCollectedPerks()}
+                </div>
+              </Card>
+              
+              <Card className="bg-black border-2 border-red-900/50 p-6 shadow-lg">
+                <div className="text-sm text-gray-400 mb-2">수집률</div>
+                <div className="text-3xl text-white">
+                  {statisticsLoading ? '...' : `${collectionRate}%`}
+                </div>
+              </Card>
+            </>
+          )}
+        </div>
 
         {/* Overall Collection Progress */}
         <Card className="bg-black border-2 border-red-900/50 p-6 mb-8 shadow-lg">

@@ -76,7 +76,7 @@ public class ViewingRecordController {
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<List<HomeViewingRecordDto>>> getMyViewingRecords(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @RequestParam(required = false) String movieTitle
+            @RequestParam(value = "movie_title", required = false) String movieTitle
     ) {
         Long userId = userDetails.getUser().getUserId();
         List<HomeViewingRecordDto> list = viewingRecordService.getMyViewingRecords(userId, movieTitle);

@@ -37,9 +37,10 @@ public class EventController {
     @GetMapping("/list")
     public ResponseEntity<ApiResponse<List<EventListDto>>> getEventList(
             @RequestParam(required = false, defaultValue = "전체") String status,
-            @RequestParam(required = false) String movieTitle
+            @RequestParam(value = "movie_title", required = false) String movieTitle,
+            @RequestParam(value = "event_title", required = false) String eventTitle
     ) {
-        List<EventListDto> list = eventService.getEventList(status, movieTitle);
+        List<EventListDto> list = eventService.getEventList(status, movieTitle, eventTitle);
         return ResponseEntity.ok(ApiResponse.success(list));
     }
 

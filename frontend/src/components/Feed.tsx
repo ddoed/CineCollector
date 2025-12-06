@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Star, MapPin, Calendar, Trophy, MoreHorizontal } from 'lucide-react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
-import { Avatar } from './ui/avatar';
+import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import { Badge } from './ui/badge';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { apiRequest } from '../lib/api';
@@ -76,6 +76,7 @@ export function Feed() {
   const [posts, setPosts] = useState<HomeViewingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [displayCount, setDisplayCount] = useState(3);
 
   useEffect(() => {
     const fetchPosts = async () => {
@@ -91,6 +92,13 @@ export function Feed() {
     };
     fetchPosts();
   }, []);
+
+  const handleLoadMore = () => {
+    setDisplayCount(prev => prev + 3);
+  };
+
+  const displayedPosts = posts.slice(0, displayCount);
+  const hasMore = posts.length > displayCount;
 
   return (
     <div className="min-h-screen px-4 py-12">
@@ -121,7 +129,7 @@ export function Feed() {
               아직 공개된 관람 기록이 없습니다.
             </Card>
           )}
-          {posts.map((post, index) => (
+          {displayedPosts.map((post, index) => (
             <motion.div
               key={post.record_id}
               initial={{ opacity: 0, y: 20 }}
@@ -133,8 +141,17 @@ export function Feed() {
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <Avatar className="w-12 h-12 bg-red-600/20 border border-red-600/30">
-                        {post.user.name.charAt(0)}
+                      <Avatar className="w-12 h-12 border border-red-600/30">
+                        {post.user.profile_image && (
+                          <AvatarImage 
+                            src={post.user.profile_image} 
+                            alt={post.user.name}
+                            className="object-cover"
+                          />
+                        )}
+                        <AvatarFallback className="bg-red-600/20 text-red-600">
+                          {post.user.name.charAt(0)}
+                        </AvatarFallback>
                       </Avatar>
                       <div>
                         <div className="flex items-center gap-2">
@@ -288,15 +305,21 @@ export function Feed() {
         </div>
 
         {/* Load More */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="mt-8 text-center"
-        >
-          <Button variant="outline" className="border-red-600 text-red-600 hover:bg-red-600/10">
-            더 보기
-          </Button>
-        </motion.div>
+        {hasMore && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mt-8 text-center"
+          >
+            <Button 
+              variant="outline" 
+              className="border-red-600 text-red-600 hover:bg-red-600/10"
+              onClick={handleLoadMore}
+            >
+              더 보기
+            </Button>
+          </motion.div>
+        )}
       </div>
     </div>
   );

@@ -134,14 +134,27 @@ public class InventoryService {
     }
 
     @Transactional
-    public InventoryResponseDto updateStock(Long creatorId, Long perkId, Long theaterId, Integer stock, PerkStatus status) {
+    public InventoryResponseDto updateStock(Long userId, Long perkId, Long theaterId, Integer stock, PerkStatus status) {
         Perk perk = perkRepository.findById(perkId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PERK_NOT_FOUND));
 
         Event event = eventRepository.findById(perk.getEventId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.EVENT_NOT_FOUND));
 
-        if (!event.getCreatorId().equals(creatorId)) {
+        // 이벤트 생성자이거나 해당 극장의 매니저인지 확인
+        boolean isCreator = event.getCreatorId().equals(userId);
+        boolean isTheaterManager = false;
+        
+        if (!isCreator) {
+            // 극장 매니저인지 확인 - theaterId로 극장을 찾고 manager_id 확인
+            Theater theater = theaterRepository.findById(theaterId)
+                    .orElse(null);
+            if (theater != null && theater.getManagerId().equals(userId)) {
+                isTheaterManager = true;
+            }
+        }
+
+        if (!isCreator && !isTheaterManager) {
             throw new BusinessException(ErrorCode.PERK_ACCESS_DENIED);
         }
 
@@ -285,26 +298,25 @@ public class InventoryService {
         Movie movie = movieRepository.findById(event.getMovieId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.MOVIE_NOT_FOUND));
 
-        // 모든 극장 목록 조회
-        List<Theater> allTheaters = theaterRepository.findAll();
-
-        // 해당 특전의 재고가 있는 극장들
+        // 해당 특전의 재고가 등록된 극장들만 조회 (이벤트 생성 시 선택한 극장들)
         List<Inventory> inventories = inventoryRepository.findAllByPerkId(perkId);
-        Map<Long, Inventory> inventoryMap = inventories.stream()
-                .collect(Collectors.toMap(Inventory::getTheaterId, inv -> inv));
 
-        List<TheaterStockDistributionDto.TheaterStockDto> theaterStocks = allTheaters.stream()
-                .map(theater -> {
-                    Inventory inventory = inventoryMap.get(theater.getTheaterId());
-                    Integer currentStock = inventory != null ? inventory.getStock() : 0;
+        List<TheaterStockDistributionDto.TheaterStockDto> theaterStocks = inventories.stream()
+                .map(inventory -> {
+                    Theater theater = theaterRepository.findById(inventory.getTheaterId())
+                            .orElse(null);
+                    if (theater == null) {
+                        return null;
+                    }
 
                     return TheaterStockDistributionDto.TheaterStockDto.builder()
                             .theaterId(theater.getTheaterId())
                             .name(theater.getName())
                             .location(theater.getLocation())
-                            .currentStock(currentStock)
+                            .currentStock(inventory.getStock())
                             .build();
                 })
+                .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
 
         return TheaterStockDistributionDto.builder()

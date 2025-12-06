@@ -69,6 +69,12 @@ public class EventDetailDto {
         @JsonProperty("limit_per_user")
         private Integer limitPerUser;
 
+        @JsonProperty("quantity")
+        private Integer quantity;
+
+        @JsonProperty("image")
+        private String image;
+
         @JsonProperty("theaters")
         private List<TheaterInventoryDto> theaters;
     }

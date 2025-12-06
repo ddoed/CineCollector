@@ -150,14 +150,34 @@ export interface EventListResponse {
 
 export interface EventDetailResponse {
   event_id: number;
-  movie_id: number;
-  movie_title: string;
-  event_title: string;
-  description?: string | null;
+  movie: {
+    movie_id: number;
+    title: string;
+    image?: string | null;
+  };
+  title: string;
+  status: string;
   start_date: string;
   end_date: string;
-  status: string;
-  perks?: PerkResponse[];
+  week_no: number;
+  image?: string | null;
+  perks: Array<{
+    perk_id: number;
+    name: string;
+    type: string;
+    description?: string | null;
+    limit_per_user: number;
+    quantity: number;
+    image?: string | null;
+    theaters: Array<{
+      theater_id: number;
+      name: string;
+      location: string;
+      stock: number;
+      status: string;
+      status_message: string;
+    }>;
+  }>;
 }
 
 export interface EventCreateRequest {
@@ -170,10 +190,9 @@ export interface EventCreateRequest {
 
 export interface EventUpdateRequest {
   title?: string;
-  description?: string;
   start_date?: string;
   end_date?: string;
-  status?: string;
+  week_no?: number;
 }
 
 export interface EventWithPerkCreateRequest {
@@ -229,10 +248,11 @@ export interface ViewingRecordCreateRequest {
 }
 
 export interface ViewingRecordUpdateRequest {
-  viewing_date?: string;
+  view_date?: string;
   rating?: number;
   review?: string;
   theater_id?: number;
+  is_public?: boolean;
 }
 
 export interface HomeViewingRecordResponse {
@@ -334,8 +354,8 @@ export interface PresignedUrlRequest {
 }
 
 export interface PresignedUrlResponse {
-  presigned_url: string;
-  file_url: string;
+  upload_url: string;
+  final_url: string;
 }
 
 // ==================== API Functions ====================
@@ -393,7 +413,7 @@ export const moviesApi = {
 export const eventsApi = {
   getAll: () => apiRequest<EventResponse[]>('/events'),
 
-  getList: (params?: { status?: string; movie_title?: string }) =>
+  getList: (params?: { status?: string; movie_title?: string; event_title?: string }) =>
     apiRequest<EventListResponse[]>(`/events/list${buildQueryString(params || {})}`),
 
   getById: (eventId: number) => apiRequest<EventResponse>(`/events/${eventId}`),
@@ -481,6 +501,23 @@ export const viewingRecordsApi = {
     }),
 };
 
+// Viewing Record Images API
+export const viewingRecordImagesApi = {
+  create: (data: { record_id: number; image_url: string }) =>
+    apiRequest<any>('/viewing-record-images', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getByRecordId: (recordId: number) =>
+    apiRequest<any[]>(`/viewing-record-images/records/${recordId}`),
+
+  delete: (imageId: number) =>
+    apiRequest<void>(`/viewing-record-images/${imageId}`, {
+      method: 'DELETE',
+    }),
+};
+
 // Perks API
 export const perksApi = {
   getByEvent: (eventId: number) => apiRequest<PerkResponse[]>(`/perks/events/${eventId}`),
@@ -545,7 +582,7 @@ export const inventoryApi = {
       body: JSON.stringify(data),
     }),
 
-  distributeStock: (perkId: number, data: { distributions: Array<{ theater_id: number; stock: number }> }) =>
+  distributeStock: (perkId: number, data: { theater_stocks: Array<{ theater_id: number; stock: number }> }) =>
     apiRequest<void>(`/inventory/${perkId}/distribution`, {
       method: 'POST',
       body: JSON.stringify(data),

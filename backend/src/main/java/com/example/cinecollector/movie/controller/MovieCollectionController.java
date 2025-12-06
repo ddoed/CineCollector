@@ -52,7 +52,7 @@ public class MovieCollectionController {
     @GetMapping("/perk-collection/list")
     public ResponseEntity<ApiResponse<List<PerkCollectionListDto>>> getPerkCollectionList(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @RequestParam(required = false) String movieTitle,
+            @RequestParam(value = "movie_title", required = false) String movieTitle,
             @RequestParam(required = false, defaultValue = "전체") String filter
     ) {
         Long userId = userDetails.getUser().getUserId();

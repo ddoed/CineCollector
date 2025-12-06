@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from './ui/dialog';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from './ui/accordion';
 import { eventsApi } from '../lib/api';
 
 type EventStatus = 'ongoing' | 'upcoming' | 'ended';
@@ -69,8 +70,17 @@ export function EventsPerks() {
       try {
         setLoading(true);
         const status = filterStatus === '전체' ? undefined : filterStatus;
-        const movieTitle = searchQuery || undefined;
-        const data = await eventsApi.getList({ status, movie_title: movieTitle });
+        const trimmedQuery = searchQuery.trim();
+        // 검색어가 있으면 영화 제목과 이벤트 제목 모두에 대해 검색
+        const params: { status?: string; movie_title?: string; event_title?: string } = {};
+        if (status) {
+          params.status = status;
+        }
+        if (trimmedQuery) {
+          params.movie_title = trimmedQuery;
+          params.event_title = trimmedQuery;
+        }
+        const data = await eventsApi.getList(params);
         setEvents(data);
       } catch (err) {
         setError((err as Error)?.message ?? '이벤트를 불러오지 못했습니다.');
@@ -125,7 +135,7 @@ export function EventsPerks() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <Input
-              placeholder="영화 제목 검색..."
+              placeholder="영화 제목 또는 이벤트 제목 검색..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 bg-gray-900 border-red-900/30 text-white"
@@ -356,56 +366,95 @@ export function EventsPerks() {
                               특전을 받을 수 있는 극장을 선택하세요
                             </DialogDescription>
                           </DialogHeader>
-                          <div className="space-y-3 mt-4">
-                            {eventDetail.perks[0].theaters?.map(theater => (
-                              <Card key={theater.theater_id} className="bg-gray-900 border border-red-900/30 p-4">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-3 flex-1">
-                                    <MapPin className="w-5 h-5 text-red-600" />
-                                    <div className="flex-1">
-                                      <div className="text-white mb-1">{theater.name}</div>
-                                      <div className="text-sm text-gray-400">{theater.location}</div>
+                          <Accordion type="multiple" defaultValue={['CGV', '메가박스', '롯데시네마']} className="mt-4">
+                            {(() => {
+                              // 극장을 체인별로 그룹화
+                              const groupedTheaters: Record<string, Theater[]> = {};
+                              eventDetail.perks[0].theaters?.forEach(theater => {
+                                let chain = '기타';
+                                if (theater.name.startsWith('CGV')) {
+                                  chain = 'CGV';
+                                } else if (theater.name.startsWith('메가박스')) {
+                                  chain = '메가박스';
+                                } else if (theater.name.startsWith('롯데시네마')) {
+                                  chain = '롯데시네마';
+                                }
+                                if (!groupedTheaters[chain]) {
+                                  groupedTheaters[chain] = [];
+                                }
+                                groupedTheaters[chain].push(theater);
+                              });
+
+                              // CGV, 메가박스, 롯데시네마, 기타 순서로 정렬
+                              const chainOrder = ['CGV', '메가박스', '롯데시네마', '기타'];
+                              const sortedChains = chainOrder.filter(chain => groupedTheaters[chain]);
+
+                              return sortedChains.map(chain => (
+                                <AccordionItem key={chain} value={chain} className="border-b border-red-900/30 last:border-b-0">
+                                  <AccordionTrigger className="hover:no-underline py-3">
+                                    <div className="flex items-center gap-2">
+                                      <h4 className="text-lg font-semibold text-white">{chain}</h4>
+                                      <Badge variant="outline" className="text-xs text-gray-400 border-gray-700">
+                                        {groupedTheaters[chain].length}개 지점
+                                      </Badge>
                                     </div>
-                                  </div>
-                                  <div className="flex items-center gap-3">
-                                    <div className="text-right">
-                                      {theater.status === '재고 있음' ? (
-                                        <>
-                                          <div className="text-green-600 text-sm">{theater.status}</div>
-                                          {theater.status_message && (
-                                            <div className="text-xs text-gray-400">{theater.status_message}</div>
-                                          )}
-                                        </>
-                                      ) : (
-                                        <div className="text-red-600 text-sm">{theater.status}</div>
-                                      )}
+                                  </AccordionTrigger>
+                                  <AccordionContent>
+                                    <div className="space-y-2 pt-2">
+                                      {groupedTheaters[chain].map(theater => (
+                                        <Card key={theater.theater_id} className="bg-gray-900 border border-red-900/30 p-4 hover:border-red-600/50 transition-colors">
+                                          <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3 flex-1">
+                                              <MapPin className="w-5 h-5 text-red-600 flex-shrink-0" />
+                                              <div className="flex-1 min-w-0">
+                                                <div className="text-white mb-1 font-medium">{theater.name}</div>
+                                                <div className="text-sm text-gray-400 truncate">{theater.location}</div>
+                                              </div>
+                                            </div>
+                                            <div className="flex items-center gap-3 flex-shrink-0">
+                                              <div className="text-right">
+                                                {theater.status === '재고 있음' ? (
+                                                  <>
+                                                    <div className="text-green-600 text-sm font-medium">{theater.status}</div>
+                                                    {theater.status_message && (
+                                                      <div className="text-xs text-gray-400">{theater.status_message}</div>
+                                                    )}
+                                                  </>
+                                                ) : (
+                                                  <div className="text-red-600 text-sm font-medium">{theater.status}</div>
+                                                )}
+                                              </div>
+                                              <Button 
+                                                size="sm"
+                                                className="bg-red-600 hover:bg-red-700 text-white whitespace-nowrap"
+                                                disabled={theater.status === '소진 완료' || eventDetail.status === '종료'}
+                                                onClick={async () => {
+                                                  try {
+                                                    const { perkApplicationsApi } = await import('../lib/api');
+                                                    await perkApplicationsApi.apply({
+                                                      perk_id: eventDetail.perks[0].perk_id,
+                                                      theater_id: theater.theater_id,
+                                                      quantity: 1,
+                                                    });
+                                                    alert('신청이 완료되었습니다.');
+                                                    setShowTheaters(false);
+                                                  } catch (err) {
+                                                    alert((err as Error)?.message || '신청에 실패했습니다.');
+                                                  }
+                                                }}
+                                              >
+                                                신청
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        </Card>
+                                      ))}
                                     </div>
-                                    <Button 
-                                      size="sm"
-                                      className="bg-red-600 hover:bg-red-700 text-white"
-                                      disabled={theater.status === '소진 완료' || eventDetail.status === '종료'}
-                                      onClick={async () => {
-                                        try {
-                                          const { perkApplicationsApi } = await import('../lib/api');
-                                          await perkApplicationsApi.apply({
-                                            perk_id: eventDetail.perks[0].perk_id,
-                                            theater_id: theater.theater_id,
-                                            quantity: 1,
-                                          });
-                                          alert('신청이 완료되었습니다.');
-                                          setShowTheaters(false);
-                                        } catch (err) {
-                                          alert((err as Error)?.message || '신청에 실패했습니다.');
-                                        }
-                                      }}
-                                    >
-                                      신청
-                                    </Button>
-                                  </div>
-                                </div>
-                              </Card>
-                            ))}
-                          </div>
+                                  </AccordionContent>
+                                </AccordionItem>
+                              ));
+                            })()}
+                          </Accordion>
                         </DialogContent>
                       </Dialog>
                     </div>

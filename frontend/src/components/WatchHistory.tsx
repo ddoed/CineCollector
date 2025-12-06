@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Calendar, Film, Search, Star, Plus, MapPin, Trophy, MoreHorizontal, Edit, Trash, Lock, Globe } from 'lucide-react';
+import { Calendar, Film, Search, Star, Plus, MapPin, Trophy, MoreHorizontal, Edit, Trash, Lock, Globe, X, Image as ImageIcon } from 'lucide-react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -9,10 +9,11 @@ import { Separator } from './ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from './ui/dialog';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { Avatar } from './ui/avatar';
+import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import { Switch } from './ui/switch';
-import { viewingRecordsApi, moviesApi, theatersApi } from '../lib/api';
+import { viewingRecordsApi, moviesApi, theatersApi, viewingRecordImagesApi } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
+import { uploadImageToS3 } from '../lib/imageUpload';
 
 const posterFallback = 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=400&q=80';
 
@@ -35,13 +36,30 @@ export function WatchHistory() {
     review: '',
   });
   const [selectedRating, setSelectedRating] = useState(0);
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<any>(null);
+  const [editFormData, setEditFormData] = useState({
+    viewingDate: '',
+    theaterId: '',
+    rating: 0,
+    review: '',
+  });
+  const [editSelectedRating, setEditSelectedRating] = useState(0);
+  const [editIsPublic, setEditIsPublic] = useState(true);
 
   useEffect(() => {
     const fetchRecords = async () => {
       try {
         setLoading(true);
-        const movieTitle = searchQuery || undefined;
-        const records = await viewingRecordsApi.getMyViewingRecords({ movie_title: movieTitle });
+        const trimmedQuery = searchQuery.trim();
+        // 검색어가 있을 때만 movie_title 파라미터에 추가 (이벤트 페이지 방식)
+        const params: { movie_title?: string } = {};
+        if (trimmedQuery) {
+          params.movie_title = trimmedQuery;
+        }
+        const records = await viewingRecordsApi.getMyViewingRecords(params);
         setMovies(records);
       } catch (err) {
         setError((err as Error)?.message ?? '관람 기록을 불러오지 못했습니다.');
@@ -80,7 +98,8 @@ export function WatchHistory() {
       return;
     }
     try {
-      await viewingRecordsApi.create({
+      // 관람기록 생성
+      const record = await viewingRecordsApi.create({
         movie_id: Number(formData.movieId),
         view_date: formData.viewingDate,
         theater_id: Number(formData.theaterId),
@@ -88,6 +107,19 @@ export function WatchHistory() {
         review: formData.review || undefined,
         is_public: isPublic,
       });
+
+      // 이미지가 있으면 업로드
+      if (uploadedImages.length > 0) {
+        await Promise.all(
+          uploadedImages.map(imageUrl =>
+            viewingRecordImagesApi.create({
+              record_id: record.record_id,
+              image_url: imageUrl,
+            })
+          )
+        );
+      }
+
       setIsDialogOpen(false);
       setFormData({
         movieId: '',
@@ -97,12 +129,47 @@ export function WatchHistory() {
         review: '',
       });
       setSelectedRating(0);
+      setUploadedImages([]);
       // 목록 새로고침
       const records = await viewingRecordsApi.getMyViewingRecords();
       setMovies(records);
       alert('관람 기록이 추가되었습니다.');
     } catch (err) {
       alert((err as Error)?.message || '관람 기록 추가에 실패했습니다.');
+    }
+  };
+
+  const handleUpdateRecord = async () => {
+    if (!editingRecord) return;
+    if (!editFormData.viewingDate) {
+      alert('관람일을 입력해주세요.');
+      return;
+    }
+    if (!editFormData.theaterId) {
+      alert('극장을 선택해주세요.');
+      return;
+    }
+    try {
+      await viewingRecordsApi.update(editingRecord.record_id, {
+        view_date: editFormData.viewingDate,
+        theater_id: Number(editFormData.theaterId),
+        rating: editSelectedRating > 0 ? editSelectedRating : undefined,
+        review: editFormData.review || undefined,
+        is_public: editIsPublic,
+      });
+      setIsEditDialogOpen(false);
+      setEditingRecord(null);
+      // 목록 새로고침
+      const trimmedQuery = searchQuery.trim();
+      const params: { movie_title?: string } = {};
+      if (trimmedQuery) {
+        params.movie_title = trimmedQuery;
+      }
+      const records = await viewingRecordsApi.getMyViewingRecords(params);
+      setMovies(records);
+      alert('관람 기록이 수정되었습니다.');
+    } catch (err) {
+      alert((err as Error)?.message || '관람 기록 수정에 실패했습니다.');
     }
   };
 
@@ -208,7 +275,21 @@ export function WatchHistory() {
         >
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-3xl">관람 기록</h1>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) {
+                // 다이얼로그 닫을 때 상태 초기화
+                setFormData({
+                  movieId: '',
+                  viewingDate: '',
+                  theaterId: '',
+                  rating: 0,
+                  review: '',
+                });
+                setSelectedRating(0);
+                setUploadedImages([]);
+              }
+            }}>
               <DialogTrigger asChild>
                 <Button className="bg-red-600 hover:bg-red-700 text-white">
                   <Plus className="w-4 h-4 mr-2" />
@@ -296,6 +377,61 @@ export function WatchHistory() {
                       className="bg-gray-900 border-red-900/50 text-white mt-2 min-h-[120px]"
                     />
                   </div>
+
+                  {/* 이미지 업로드 */}
+                  <div>
+                    <Label className="text-gray-300">이미지 (여러 개 선택 가능)</Label>
+                    <Input 
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="bg-gray-900 border-red-900/50 text-white mt-2"
+                      onChange={async (e) => {
+                        const files = Array.from(e.target.files || []);
+                        if (files.length > 0) {
+                          try {
+                            setUploadingImages(true);
+                            const uploadPromises = files.map(file => uploadImageToS3(file, 'viewing-records'));
+                            const urls = await Promise.all(uploadPromises);
+                            setUploadedImages(prev => [...prev, ...urls]);
+                          } catch (err) {
+                            alert((err as Error)?.message || '이미지 업로드에 실패했습니다.');
+                          } finally {
+                            setUploadingImages(false);
+                            // input 초기화
+                            e.target.value = '';
+                          }
+                        }
+                      }}
+                      disabled={uploadingImages}
+                    />
+                    {uploadingImages && (
+                      <p className="text-sm text-gray-400 mt-1">업로드 중...</p>
+                    )}
+                    {uploadedImages.length > 0 && (
+                      <div className="mt-4 grid grid-cols-3 gap-2">
+                        {uploadedImages.map((url, index) => (
+                          <div key={index} className="relative group">
+                            <ImageWithFallback
+                              src={url}
+                              alt={`업로드된 이미지 ${index + 1}`}
+                              className="w-full aspect-square object-cover rounded-lg border border-red-900/30"
+                            />
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 hover:bg-black/90 text-white p-1 h-6 w-6"
+                              onClick={() => {
+                                setUploadedImages(prev => prev.filter((_, i) => i !== index));
+                              }}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   
                   <Separator className="bg-red-900/30" />
                   
@@ -345,6 +481,7 @@ export function WatchHistory() {
                           review: '',
                         });
                         setSelectedRating(0);
+                        setUploadedImages([]);
                       }}
                     >
                       취소
@@ -354,6 +491,139 @@ export function WatchHistory() {
               </DialogContent>
             </Dialog>
           </div>
+
+          {/* 수정 다이얼로그 */}
+          <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+            setIsEditDialogOpen(open);
+            if (!open) {
+              setEditingRecord(null);
+              setEditFormData({
+                viewingDate: '',
+                theaterId: '',
+                rating: 0,
+                review: '',
+              });
+              setEditSelectedRating(0);
+              setEditIsPublic(true);
+            }
+          }}>
+            <DialogContent className="bg-black border-2 border-red-600/50 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-xl">관람 기록 수정</DialogTitle>
+                <DialogDescription className="text-gray-400">
+                  관람 기록을 수정하세요.
+                </DialogDescription>
+              </DialogHeader>
+              {editingRecord && (
+                <div className="space-y-4 mt-4">
+                  <div>
+                    <Label className="text-gray-300">영화</Label>
+                    <div className="mt-2 p-3 bg-gray-900 border border-red-900/50 rounded-md text-white">
+                      {editingRecord.movie?.title || editingRecord.movie_title || '알 수 없음'}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-watch-date" className="text-gray-300">관람일</Label>
+                      <Input 
+                        id="edit-watch-date" 
+                        type="date"
+                        value={editFormData.viewingDate}
+                        onChange={(e) => setEditFormData({ ...editFormData, viewingDate: e.target.value })}
+                        className="bg-gray-900 border-red-900/50 text-white mt-2"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-theater" className="text-gray-300">극장</Label>
+                      <select
+                        id="edit-theater"
+                        value={editFormData.theaterId}
+                        onChange={(e) => setEditFormData({ ...editFormData, theaterId: e.target.value })}
+                        className="w-full bg-gray-900 border border-red-900/50 text-white rounded-md px-3 py-2 mt-2"
+                        required
+                      >
+                        <option value="">극장을 선택하세요</option>
+                        {allTheaters.map(theater => (
+                          <option key={theater.theater_id} value={theater.theater_id}>
+                            {theater.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-gray-300">별점</Label>
+                    <div className="flex items-center gap-1 mt-2">
+                      {[1, 2, 3, 4, 5].map((rating) => (
+                        <Star 
+                          key={rating}
+                          onClick={() => setEditSelectedRating(rating)}
+                          className={`w-8 h-8 cursor-pointer transition-colors ${
+                            rating <= editSelectedRating
+                              ? 'text-red-600 fill-red-600'
+                              : 'text-gray-600 hover:text-red-600'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-review" className="text-gray-300">관람 후기</Label>
+                    <Textarea 
+                      id="edit-review" 
+                      value={editFormData.review}
+                      onChange={(e) => setEditFormData({ ...editFormData, review: e.target.value })}
+                      placeholder="영화에 대한 감상을 작성해주세요..."
+                      className="bg-gray-900 border-red-900/50 text-white mt-2 min-h-[120px]"
+                    />
+                  </div>
+                  
+                  <Separator className="bg-red-900/30" />
+                  
+                  {/* Public/Private Toggle */}
+                  <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg border border-red-900/30">
+                    <div className="flex items-center gap-3">
+                      {editIsPublic ? (
+                        <Globe className="w-5 h-5 text-red-600" />
+                      ) : (
+                        <Lock className="w-5 h-5 text-gray-400" />
+                      )}
+                      <div>
+                        <Label className="text-white cursor-pointer">
+                          {editIsPublic ? '공개 게시물' : '비공개 게시물'}
+                        </Label>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {editIsPublic ? '모든 사용자가 볼 수 있습니다' : '나만 볼 수 있습니다'}
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={editIsPublic}
+                      onCheckedChange={setEditIsPublic}
+                      className="data-[state=checked]:bg-red-600"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      onClick={handleUpdateRecord}
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                    >
+                      수정 완료
+                    </Button>
+                    <Button
+                      onClick={() => setIsEditDialogOpen(false)}
+                      variant="outline"
+                      className="flex-1 border-red-900/50 text-gray-400 hover:text-white"
+                    >
+                      취소
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
 
           {/* Stats Cards */}
           <div className="grid grid-cols-3 gap-4 mb-6">
@@ -393,20 +663,28 @@ export function WatchHistory() {
               >
                 전체
               </Button>
-              <Button
-                variant={selectedYear === '2024' ? 'default' : 'outline'}
-                onClick={() => setSelectedYear('2024')}
-                className={selectedYear === '2024' ? 'bg-red-600 hover:bg-red-700' : 'border-red-900/50 text-gray-400 hover:text-white'}
-              >
-                2024
-              </Button>
-              <Button
-                variant={selectedYear === '2023' ? 'default' : 'outline'}
-                onClick={() => setSelectedYear('2023')}
-                className={selectedYear === '2023' ? 'bg-red-600 hover:bg-red-700' : 'border-red-900/50 text-gray-400 hover:text-white'}
-              >
-                2023
-              </Button>
+              {(() => {
+                const currentYear = new Date().getFullYear();
+                const lastYear = currentYear - 1;
+                return (
+                  <>
+                    <Button
+                      variant={selectedYear === String(currentYear) ? 'default' : 'outline'}
+                      onClick={() => setSelectedYear(String(currentYear))}
+                      className={selectedYear === String(currentYear) ? 'bg-red-600 hover:bg-red-700' : 'border-red-900/50 text-gray-400 hover:text-white'}
+                    >
+                      {currentYear}
+                    </Button>
+                    <Button
+                      variant={selectedYear === String(lastYear) ? 'default' : 'outline'}
+                      onClick={() => setSelectedYear(String(lastYear))}
+                      className={selectedYear === String(lastYear) ? 'bg-red-600 hover:bg-red-700' : 'border-red-900/50 text-gray-400 hover:text-white'}
+                    >
+                      {lastYear}
+                    </Button>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </motion.div>
@@ -436,8 +714,17 @@ export function WatchHistory() {
                   {/* Post Header */}
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <Avatar className="w-12 h-12 bg-red-600/20 border border-red-600/30">
-                        {user?.name?.[0] || 'U'}
+                      <Avatar className="w-12 h-12 border border-red-600/30">
+                        {user?.profileImage && (
+                          <AvatarImage 
+                            src={user.profileImage} 
+                            alt={user?.name || '프로필'}
+                            className="object-cover"
+                          />
+                        )}
+                        <AvatarFallback className="bg-red-600/20 text-red-600">
+                          {user?.name?.[0] || 'U'}
+                        </AvatarFallback>
                       </Avatar>
                       <div>
                         <div className="text-white">{user?.name || '사용자'}</div>
@@ -506,8 +793,17 @@ export function WatchHistory() {
                         size="sm" 
                         variant="ghost" 
                         className="text-gray-400 hover:text-white"
-                        onClick={async () => {
-                          // TODO: 수정 기능 구현
+                        onClick={() => {
+                          setEditingRecord(record);
+                          setEditFormData({
+                            viewingDate: record.viewing_date || record.view_date || '',
+                            theaterId: record.theater_id ? String(record.theater_id) : '',
+                            rating: record.rating || 0,
+                            review: record.review || '',
+                          });
+                          setEditSelectedRating(record.rating || 0);
+                          setEditIsPublic(record.is_public !== false);
+                          setIsEditDialogOpen(true);
                         }}
                       >
                         <Edit className="w-4 h-4" />
@@ -520,9 +816,17 @@ export function WatchHistory() {
                           if (confirm('정말 삭제하시겠습니까?')) {
                             try {
                               await viewingRecordsApi.delete(record.record_id);
-                              setMovies(movies.filter(m => m.record_id !== record.record_id));
+                              // 목록 새로고침
+                              const trimmedQuery = searchQuery.trim();
+                              const params: { movie_title?: string } = {};
+                              if (trimmedQuery) {
+                                params.movie_title = trimmedQuery;
+                              }
+                              const records = await viewingRecordsApi.getMyViewingRecords(params);
+                              setMovies(records);
+                              alert('관람 기록이 삭제되었습니다.');
                             } catch (err) {
-                              alert('삭제에 실패했습니다.');
+                              alert((err as Error)?.message || '삭제에 실패했습니다.');
                             }
                           }
                         }}

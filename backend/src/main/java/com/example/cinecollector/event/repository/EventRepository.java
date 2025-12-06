@@ -74,7 +74,7 @@ public class EventRepository {
         return jdbcTemplate.query(sql, rowMapper);
     }
 
-    public List<Event> findAllWithFilters(String status, String movieTitle) {
+    public List<Event> findAllWithFilters(String status, String movieTitle, String eventTitle) {
         StringBuilder sql = new StringBuilder("""
             SELECT e.*
             FROM events e
@@ -90,37 +90,51 @@ public class EventRepository {
             }
         }
 
-        if (movieTitle != null && !movieTitle.trim().isEmpty()) {
-            sql.append(" AND m.title ILIKE ?");
+        // 영화 제목과 이벤트 제목 검색 (OR 조건)
+        boolean hasMovieTitle = movieTitle != null && !movieTitle.trim().isEmpty();
+        boolean hasEventTitle = eventTitle != null && !eventTitle.trim().isEmpty();
+        
+        if (hasMovieTitle || hasEventTitle) {
+            sql.append(" AND (");
+            boolean first = true;
+            if (hasMovieTitle) {
+                sql.append(" m.title ILIKE ?");
+                first = false;
+            }
+            if (hasEventTitle) {
+                if (!first) {
+                    sql.append(" OR");
+                }
+                sql.append(" e.title ILIKE ?");
+            }
+            sql.append(" )");
         }
 
         sql.append(" ORDER BY e.start_date DESC, e.event_id DESC");
 
+        List<Object> params = new java.util.ArrayList<>();
+
         if (status != null && !status.isEmpty() && !status.equals("전체")) {
             LocalDate today = LocalDate.now();
+            params.add(today);
             if (status.equals("진행 중")) {
-                if (movieTitle != null && !movieTitle.trim().isEmpty()) {
-                    return jdbcTemplate.query(sql.toString(), rowMapper, today, today, "%" + movieTitle + "%");
-                }
-                return jdbcTemplate.query(sql.toString(), rowMapper, today, today);
-            } else if (status.equals("예정")) {
-                if (movieTitle != null && !movieTitle.trim().isEmpty()) {
-                    return jdbcTemplate.query(sql.toString(), rowMapper, today, "%" + movieTitle + "%");
-                }
-                return jdbcTemplate.query(sql.toString(), rowMapper, today);
-            } else if (status.equals("종료")) {
-                if (movieTitle != null && !movieTitle.trim().isEmpty()) {
-                    return jdbcTemplate.query(sql.toString(), rowMapper, today, "%" + movieTitle + "%");
-                }
-                return jdbcTemplate.query(sql.toString(), rowMapper, today);
+                params.add(today);
             }
         }
 
-        if (movieTitle != null && !movieTitle.trim().isEmpty()) {
-            return jdbcTemplate.query(sql.toString(), rowMapper, "%" + movieTitle + "%");
+        if (hasMovieTitle) {
+            params.add("%" + movieTitle + "%");
         }
 
-        return jdbcTemplate.query(sql.toString(), rowMapper);
+        if (hasEventTitle) {
+            params.add("%" + eventTitle + "%");
+        }
+
+        if (params.isEmpty()) {
+            return jdbcTemplate.query(sql.toString(), rowMapper);
+        }
+
+        return jdbcTemplate.query(sql.toString(), rowMapper, params.toArray());
     }
 
     public List<Event> findAllByCreatorId(Long creatorId) {

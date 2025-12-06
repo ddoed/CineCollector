@@ -76,8 +76,14 @@ public class MovieCollectionRepository {
             WHERE 1=1
         """);
 
-        if (movieTitle != null && !movieTitle.trim().isEmpty()) {
+        List<Object> params = new java.util.ArrayList<>();
+        params.add(userId);
+
+        // 검색어가 있을 때만 검색 조건 추가
+        boolean hasMovieTitle = movieTitle != null && !movieTitle.trim().isEmpty();
+        if (hasMovieTitle) {
             sql.append(" AND m.title ILIKE ?");
+            params.add("%" + movieTitle + "%");
         }
 
         sql.append(" GROUP BY m.movie_id, m.title, m.image");
@@ -92,10 +98,7 @@ public class MovieCollectionRepository {
 
         sql.append(" ORDER BY m.movie_id DESC");
 
-        if (movieTitle != null && !movieTitle.trim().isEmpty()) {
-            return jdbcTemplate.queryForList(sql.toString(), userId, "%" + movieTitle + "%");
-        }
-        return jdbcTemplate.queryForList(sql.toString(), userId);
+        return jdbcTemplate.queryForList(sql.toString(), params.toArray());
     }
 
     public List<Map<String, Object>> findPerksByMovieId(Long userId, Long movieId) {

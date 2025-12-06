@@ -13,10 +13,13 @@ import { Checkbox } from './ui/checkbox';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { eventsApi, theatersApi, moviesApi, inventoryApi } from '../lib/api';
 import { StockDistributionDialog } from './StockDistributionDialog';
+import { uploadImageToS3 } from '../lib/imageUpload';
+import { useAuth } from '../hooks/useAuth';
 
 const posterFallback = 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=400&q=80';
 
 export function CreatorDashboard() {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTheaters, setSelectedTheaters] = useState<number[]>([]);
   const [theaterSearchQuery, setTheaterSearchQuery] = useState('');
@@ -29,6 +32,31 @@ export function CreatorDashboard() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedEventForDistribution, setSelectedEventForDistribution] = useState<any>(null);
   const [distributionStocks, setDistributionStocks] = useState<Record<number, number>>({});
+  const [eventImageUrl, setEventImageUrl] = useState<string>('');
+  const [perkImageUrl, setPerkImageUrl] = useState<string>('');
+  const [uploadingEventImage, setUploadingEventImage] = useState(false);
+  const [uploadingPerkImage, setUploadingPerkImage] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<any>(null);
+  const [editFormData, setEditFormData] = useState({
+    title: '',
+    startDate: '',
+    endDate: '',
+    weekNo: '',
+    eventImage: '',
+    perkName: '',
+    perkType: '',
+    totalQuantity: '',
+    limitPerUser: '',
+    perkDescription: '',
+    perkImage: '',
+    isPublic: true,
+  });
+  const [editSelectedTheaters, setEditSelectedTheaters] = useState<number[]>([]);
+  const [editEventImageUrl, setEditEventImageUrl] = useState<string>('');
+  const [editPerkImageUrl, setEditPerkImageUrl] = useState<string>('');
+  const [uploadingEditEventImage, setUploadingEditEventImage] = useState(false);
+  const [uploadingEditPerkImage, setUploadingEditPerkImage] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -72,10 +100,14 @@ export function CreatorDashboard() {
     );
   };
 
-  const filteredTheaters = theaters.filter(theater => 
-    theater.name?.toLowerCase().includes(theaterSearchQuery.toLowerCase()) ||
-    theater.location?.toLowerCase().includes(theaterSearchQuery.toLowerCase())
-  );
+  const filteredTheaters = theaters.filter(theater => {
+    // Creator의 이름(예: 'CGV', '메가박스', '롯데시네마')으로 시작하는 극장만 필터링
+    const matchesCreator = user?.name && theater.name?.startsWith(user.name);
+    // 검색어 필터링
+    const matchesSearch = theater.name?.toLowerCase().includes(theaterSearchQuery.toLowerCase()) ||
+      theater.location?.toLowerCase().includes(theaterSearchQuery.toLowerCase());
+    return matchesCreator && matchesSearch;
+  });
 
   const mockEvents = [
     {
@@ -214,6 +246,34 @@ export function CreatorDashboard() {
     }
   };
 
+  const handleUpdateEvent = async () => {
+    if (!editingEvent) return;
+    if (!editFormData.title || !editFormData.startDate || !editFormData.endDate || !editFormData.weekNo) {
+      alert('모든 필드를 입력해주세요.');
+      return;
+    }
+    try {
+      await eventsApi.update(editingEvent.event_id, {
+        title: editFormData.title,
+        start_date: editFormData.startDate,
+        end_date: editFormData.endDate,
+        week_no: Number(editFormData.weekNo),
+      });
+      setIsEditDialogOpen(false);
+      setEditingEvent(null);
+      // 목록 새로고침
+      const [eventsData, statsData] = await Promise.all([
+        eventsApi.getManagementList({ status: '전체' }),
+        eventsApi.getManagementStatistics(),
+      ]);
+      setEvents(eventsData);
+      setAnalytics(statsData);
+      alert('이벤트가 수정되었습니다.');
+    } catch (err) {
+      alert((err as Error)?.message || '이벤트 수정에 실패했습니다.');
+    }
+  };
+
   const handleDeleteEvent = async (eventId: number) => {
     if (!confirm('정말 이벤트를 삭제하시겠습니까?')) {
       return;
@@ -234,19 +294,19 @@ export function CreatorDashboard() {
 
   const handleDistributeStock = async (perkId: number) => {
     try {
-      const distributions = Object.entries(distributionStocks)
+      const theaterStocks = Object.entries(distributionStocks)
         .filter(([_, stock]) => stock > 0)
         .map(([theaterId, stock]) => ({
           theater_id: Number(theaterId),
           stock: Number(stock),
         }));
 
-      if (distributions.length === 0) {
+      if (theaterStocks.length === 0) {
         alert('배포할 재고를 입력해주세요.');
         return;
       }
 
-      await inventoryApi.distributeStock(perkId, { distributions });
+      await inventoryApi.distributeStock(perkId, { theater_stocks: theaterStocks });
       setSelectedEventForDistribution(null);
       setDistributionStocks({});
       alert('재고 배포가 완료되었습니다.');
@@ -269,7 +329,14 @@ export function CreatorDashboard() {
               <Calendar className="w-8 h-8 text-red-600" />
               <h1 className="text-3xl md:text-4xl text-white">이벤트 관리</h1>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) {
+                // 다이얼로그 닫을 때 이미지 URL 초기화
+                setEventImageUrl('');
+                setPerkImageUrl('');
+              }
+            }}>
               <DialogTrigger asChild>
                 <Button size="lg" className="bg-red-600 hover:bg-red-700 text-white">
                   <Plus className="w-5 h-5 mr-2" />
@@ -277,10 +344,10 @@ export function CreatorDashboard() {
                 </Button>
               </DialogTrigger>
               <DialogContent 
-                className="bg-black border-2 border-red-600/50 text-white max-h-[90vh] overflow-y-auto"
-                style={{ maxWidth: '60vw', width: '60vw' }}
+                className="bg-black border-2 border-red-600/50 text-white"
+                style={{ maxWidth: '60vw', width: '60vw', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
               >
-                <DialogHeader>
+                <DialogHeader className="flex-shrink-0">
                   <DialogTitle className="text-xl text-white">신규 이벤트 등록</DialogTitle>
                   <DialogDescription className="text-gray-400">
                     새로운 특전 이벤트를 등록합니다. 이벤트 하나당 특전 하나가 등록됩니다.
@@ -296,17 +363,21 @@ export function CreatorDashboard() {
                     startDate: formData.get('startDate') as string,
                     endDate: formData.get('endDate') as string,
                     weekNo: Number(formData.get('weekNo')),
-                    eventImage: formData.get('eventImage') as string || undefined,
+                    eventImage: eventImageUrl || undefined,
                     isPublic: isPublicValue === 'true' || isPublicValue === 'on',
                     perkName: formData.get('perkName') as string,
                     perkType: formData.get('perkType') as string,
                     totalQuantity: Number(formData.get('totalQuantity')),
                     limitPerUser: Number(formData.get('limitPerUser')),
                     perkDescription: formData.get('perkDescription') as string || undefined,
-                    perkImage: formData.get('perkImage') as string || undefined,
+                    perkImage: perkImageUrl || undefined,
                   });
-                }}>
-                <div className="grid grid-cols-2 gap-6 mt-4">
+                  // 폼 제출 후 이미지 URL 초기화
+                  setEventImageUrl('');
+                  setPerkImageUrl('');
+                }} className="flex-1 flex flex-col overflow-hidden min-h-0">
+                <div className="flex-1 overflow-y-auto pr-2 min-h-0">
+                  <div className="grid grid-cols-2 gap-6 mt-4">
                   {/* Left Column - Event Info */}
                   <div className="space-y-4">
                     <div>
@@ -364,12 +435,34 @@ export function CreatorDashboard() {
                       />
                     </div>
                     <div>
-                      <Label className="text-gray-300">이벤트 이미지 URL</Label>
+                      <Label className="text-gray-300">이벤트 이미지</Label>
                       <Input 
-                        name="eventImage"
-                        placeholder="https://..."
+                        type="file"
+                        accept="image/*"
                         className="bg-gray-900 border-red-900/50 text-white mt-2"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            try {
+                              setUploadingEventImage(true);
+                              const url = await uploadImageToS3(file, 'events');
+                              setEventImageUrl(url);
+                            } catch (err) {
+                              alert((err as Error)?.message || '이미지 업로드에 실패했습니다.');
+                            } finally {
+                              setUploadingEventImage(false);
+                            }
+                          }
+                        }}
+                        disabled={uploadingEventImage}
                       />
+                      <input type="hidden" name="eventImage" value={eventImageUrl} />
+                      {uploadingEventImage && (
+                        <p className="text-sm text-gray-400 mt-1">업로드 중...</p>
+                      )}
+                      {eventImageUrl && !uploadingEventImage && (
+                        <p className="text-sm text-green-400 mt-1">✓ 업로드 완료</p>
+                      )}
                     </div>
                     
                     {/* Perk Info */}
@@ -430,12 +523,34 @@ export function CreatorDashboard() {
                           />
                         </div>
                         <div>
-                          <Label className="text-gray-300">특전 이미지 URL</Label>
+                          <Label className="text-gray-300">특전 이미지</Label>
                           <Input 
-                            name="perkImage"
-                            placeholder="https://..."
+                            type="file"
+                            accept="image/*"
                             className="bg-gray-900 border-red-900/50 text-white mt-2"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                try {
+                                  setUploadingPerkImage(true);
+                                  const url = await uploadImageToS3(file, 'perks');
+                                  setPerkImageUrl(url);
+                                } catch (err) {
+                                  alert((err as Error)?.message || '이미지 업로드에 실패했습니다.');
+                                } finally {
+                                  setUploadingPerkImage(false);
+                                }
+                              }
+                            }}
+                            disabled={uploadingPerkImage}
                           />
+                          <input type="hidden" name="perkImage" value={perkImageUrl} />
+                          {uploadingPerkImage && (
+                            <p className="text-sm text-gray-400 mt-1">업로드 중...</p>
+                          )}
+                          {perkImageUrl && !uploadingPerkImage && (
+                            <p className="text-sm text-green-400 mt-1">✓ 업로드 완료</p>
+                          )}
                         </div>
                         <div>
                           <div className="flex items-center justify-between">
@@ -468,18 +583,23 @@ export function CreatorDashboard() {
                       <div className="flex items-center gap-2">
                         <Checkbox 
                           id="select-all"
-                          checked={selectedTheaters.length === theaters.length && theaters.length > 0}
+                          checked={filteredTheaters.length > 0 && filteredTheaters.every(t => selectedTheaters.includes(t.theater_id))}
                           onCheckedChange={(checked) => {
                             if (checked) {
-                              setSelectedTheaters(theaters.map(t => t.theater_id));
+                              setSelectedTheaters(prev => {
+                                const newIds = filteredTheaters.map(t => t.theater_id);
+                                return [...new Set([...prev, ...newIds])];
+                              });
                             } else {
-                              setSelectedTheaters([]);
+                              setSelectedTheaters(prev => 
+                                prev.filter(id => !filteredTheaters.some(t => t.theater_id === id))
+                              );
                             }
                           }}
                           className="border-red-600 data-[state=checked]:bg-red-600"
                         />
                         <Label htmlFor="select-all" className="text-white cursor-pointer text-sm">
-                          전체 선택 ({selectedTheaters.length}/{theaters.length})
+                          전체 선택 ({selectedTheaters.filter(id => filteredTheaters.some(t => t.theater_id === id)).length}/{filteredTheaters.length})
                         </Label>
                       </div>
                     </div>
@@ -522,9 +642,10 @@ export function CreatorDashboard() {
                       )}
                     </div>
                   </div>
+                  </div>
                 </div>
                 
-                <div className="flex gap-2 pt-4 mt-6 border-t border-red-900/30">
+                <div className="flex gap-2 pt-4 mt-6 border-t border-red-900/30 flex-shrink-0">
                   <Button type="submit" className="flex-1 bg-red-600 hover:bg-red-700 text-white">
                     이벤트 등록
                   </Button>
@@ -660,7 +781,50 @@ export function CreatorDashboard() {
                               </div>
                             </div>
                             <div className="flex items-center gap-2 md:self-start">
-                              <Button size="sm" variant="outline" className="border-red-600 text-red-600 hover:bg-red-600/10">
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="border-red-600 text-red-600 hover:bg-red-600/10"
+                                onClick={async () => {
+                                  try {
+                                    // 이벤트 상세 정보 가져오기
+                                    const eventDetail = await eventsApi.getDetail(event.event_id);
+                                    const firstPerk = eventDetail.perks && eventDetail.perks.length > 0 ? eventDetail.perks[0] : null;
+                                    
+                                    setEditingEvent(eventDetail);
+                                    setEditFormData({
+                                      title: eventDetail.title || '',
+                                      startDate: eventDetail.start_date || '',
+                                      endDate: eventDetail.end_date || '',
+                                      weekNo: eventDetail.week_no ? String(eventDetail.week_no) : '',
+                                      eventImage: eventDetail.image || '',
+                                      perkName: firstPerk?.name || '',
+                                      perkType: firstPerk?.type || '',
+                                      totalQuantity: firstPerk?.quantity ? String(firstPerk.quantity) : '',
+                                      limitPerUser: firstPerk?.limit_per_user ? String(firstPerk.limit_per_user) : '',
+                                      perkDescription: firstPerk?.description || '',
+                                      perkImage: firstPerk?.image || '',
+                                      isPublic: true, // EventDetailDto에 is_public이 없으므로 기본값 사용
+                                    });
+                                    setEditEventImageUrl(eventDetail.image || '');
+                                    setEditPerkImageUrl(firstPerk?.image || '');
+                                    
+                                    // 현재 선택된 극장 정보 가져오기 (등록된 모든 극장 체크)
+                                    if (firstPerk?.theaters) {
+                                      // 이벤트 생성 시 선택한 극장들 (재고가 0이어도 등록된 극장)
+                                      const selectedTheaterIds = firstPerk.theaters
+                                        .map((t) => t.theater_id);
+                                      setEditSelectedTheaters(selectedTheaterIds);
+                                    } else {
+                                      setEditSelectedTheaters([]);
+                                    }
+                                    
+                                    setIsEditDialogOpen(true);
+                                  } catch (err) {
+                                    alert((err as Error)?.message || '이벤트 상세 정보를 불러오지 못했습니다.');
+                                  }
+                                }}
+                              >
                                 <Edit className="w-4 h-4 mr-1" />
                                 수정
                               </Button>
@@ -697,7 +861,6 @@ export function CreatorDashboard() {
                                 movieTitle={event.movie?.title || '영화 제목'}
                                 perkType={firstPerk.type}
                                 perkId={firstPerk.perk_id}
-                                theaters={theaters}
                                 distributionStocks={distributionStocks}
                                 onStockChange={(theaterId, stock) => {
                                   setDistributionStocks({
@@ -729,6 +892,337 @@ export function CreatorDashboard() {
             )}
           </div>
         )}
+
+        {/* 수정 다이얼로그 */}
+        <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+          setIsEditDialogOpen(open);
+          if (!open) {
+            setEditingEvent(null);
+            setEditFormData({
+              title: '',
+              startDate: '',
+              endDate: '',
+              weekNo: '',
+              eventImage: '',
+              perkName: '',
+              perkType: '',
+              totalQuantity: '',
+              limitPerUser: '',
+              perkDescription: '',
+              perkImage: '',
+              isPublic: true,
+            });
+            setEditEventImageUrl('');
+            setEditPerkImageUrl('');
+            setEditSelectedTheaters([]);
+          }
+        }}>
+          <DialogContent 
+            className="bg-black border-2 border-red-600/50 text-white"
+            style={{ maxWidth: '60vw', width: '60vw', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+          >
+            <DialogHeader>
+              <DialogTitle className="text-xl text-white">이벤트 수정</DialogTitle>
+              <DialogDescription className="text-gray-400">
+                이벤트 정보를 수정하세요.
+              </DialogDescription>
+            </DialogHeader>
+            {editingEvent && (
+              <div className="flex-1 overflow-y-auto pr-2">
+                <div className="grid grid-cols-2 gap-6 mt-4">
+                {/* Left Column - Event Info */}
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-gray-300">영화</Label>
+                    <div className="mt-2 p-3 bg-gray-900 border border-red-900/50 rounded-md text-white">
+                      {editingEvent.movie?.title || '알 수 없음'}
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-event-title" className="text-gray-300">이벤트 제목</Label>
+                    <Input 
+                      id="edit-event-title"
+                      value={editFormData.title}
+                      onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+                      placeholder="예: 1주차 포토카드 이벤트"
+                      className="bg-gray-900 border-red-900/50 text-white mt-2"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-start-date" className="text-gray-300">시작일</Label>
+                      <Input 
+                        id="edit-start-date"
+                        type="date"
+                        value={editFormData.startDate}
+                        onChange={(e) => setEditFormData({ ...editFormData, startDate: e.target.value })}
+                        className="bg-gray-900 border-red-900/50 text-white mt-2"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-end-date" className="text-gray-300">종료일</Label>
+                      <Input 
+                        id="edit-end-date"
+                        type="date"
+                        value={editFormData.endDate}
+                        onChange={(e) => setEditFormData({ ...editFormData, endDate: e.target.value })}
+                        className="bg-gray-900 border-red-900/50 text-white mt-2"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-week-no" className="text-gray-300">주차</Label>
+                    <Input 
+                      id="edit-week-no"
+                      type="number"
+                      value={editFormData.weekNo}
+                      onChange={(e) => setEditFormData({ ...editFormData, weekNo: e.target.value })}
+                      placeholder="1"
+                      className="bg-gray-900 border-red-900/50 text-white mt-2"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-gray-300">이벤트 이미지</Label>
+                    <Input 
+                      type="file"
+                      accept="image/*"
+                      className="bg-gray-900 border-red-900/50 text-white mt-2"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          try {
+                            setUploadingEditEventImage(true);
+                            const url = await uploadImageToS3(file, 'events');
+                            setEditEventImageUrl(url);
+                            setEditFormData({ ...editFormData, eventImage: url });
+                          } catch (err) {
+                            alert((err as Error)?.message || '이미지 업로드에 실패했습니다.');
+                          } finally {
+                            setUploadingEditEventImage(false);
+                          }
+                        }
+                      }}
+                      disabled={uploadingEditEventImage}
+                    />
+                    {uploadingEditEventImage && (
+                      <p className="text-sm text-gray-400 mt-1">업로드 중...</p>
+                    )}
+                    {editEventImageUrl && !uploadingEditEventImage && (
+                      <p className="text-sm text-green-400 mt-1">✓ 업로드 완료</p>
+                    )}
+                    {editEventImageUrl && (
+                      <img src={editEventImageUrl} alt="이벤트 이미지" className="mt-2 w-full h-32 object-cover rounded" />
+                    )}
+                  </div>
+                  
+                  {/* Perk Info */}
+                  <div className="border-t border-red-900/30 pt-4 mt-4">
+                    <h3 className="text-white mb-4">특전 정보</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-gray-300">특전 이름</Label>
+                        <Input 
+                          value={editFormData.perkName}
+                          onChange={(e) => setEditFormData({ ...editFormData, perkName: e.target.value })}
+                          placeholder="예: 포토카드 세트"
+                          className="bg-gray-900 border-red-900/50 text-white mt-2"
+                          required
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-gray-300">특전 종류</Label>
+                          <Select value={editFormData.perkType} onValueChange={(value) => setEditFormData({ ...editFormData, perkType: value })}>
+                            <SelectTrigger className="bg-gray-900 border-red-900/50 text-white mt-2">
+                              <SelectValue placeholder="선택" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-gray-900 border-red-900/50">
+                              <SelectItem value="굿즈" className="text-white">굿즈</SelectItem>
+                              <SelectItem value="포스터" className="text-white">포스터</SelectItem>
+                              <SelectItem value="포토카드" className="text-white">포토카드</SelectItem>
+                              <SelectItem value="필름" className="text-white">필름</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-gray-300">총 제작 수량</Label>
+                          <Input 
+                            type="number"
+                            value={editFormData.totalQuantity}
+                            onChange={(e) => setEditFormData({ ...editFormData, totalQuantity: e.target.value })}
+                            placeholder="500"
+                            className="bg-gray-900 border-red-900/50 text-white mt-2"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-gray-300">1인당 수령 제한</Label>
+                        <Input 
+                          type="number"
+                          value={editFormData.limitPerUser}
+                          onChange={(e) => setEditFormData({ ...editFormData, limitPerUser: e.target.value })}
+                          placeholder="1"
+                          className="bg-gray-900 border-red-900/50 text-white mt-2"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-gray-300">특전 설명</Label>
+                        <Input 
+                          value={editFormData.perkDescription}
+                          onChange={(e) => setEditFormData({ ...editFormData, perkDescription: e.target.value })}
+                          placeholder="특전 설명 (선택사항)"
+                          className="bg-gray-900 border-red-900/50 text-white mt-2"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-gray-300">특전 이미지</Label>
+                        <Input 
+                          type="file"
+                          accept="image/*"
+                          className="bg-gray-900 border-red-900/50 text-white mt-2"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              try {
+                                setUploadingEditPerkImage(true);
+                                const url = await uploadImageToS3(file, 'perks');
+                                setEditPerkImageUrl(url);
+                                setEditFormData({ ...editFormData, perkImage: url });
+                              } catch (err) {
+                                alert((err as Error)?.message || '이미지 업로드에 실패했습니다.');
+                              } finally {
+                                setUploadingEditPerkImage(false);
+                              }
+                            }
+                          }}
+                          disabled={uploadingEditPerkImage}
+                        />
+                        {uploadingEditPerkImage && (
+                          <p className="text-sm text-gray-400 mt-1">업로드 중...</p>
+                        )}
+                        {editPerkImageUrl && !uploadingEditPerkImage && (
+                          <p className="text-sm text-green-400 mt-1">✓ 업로드 완료</p>
+                        )}
+                        {editPerkImageUrl && (
+                          <img src={editPerkImageUrl} alt="특전 이미지" className="mt-2 w-full h-32 object-cover rounded" />
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <Label className="text-gray-300">이벤트 공개</Label>
+                          <Switch 
+                            checked={editFormData.isPublic}
+                            onCheckedChange={(checked) => setEditFormData({ ...editFormData, isPublic: checked })}
+                            className="data-[state=checked]:bg-red-600"
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          비공개 시 일반 사용자에게 표시되지 않습니다
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column - Theater Selection */}
+                <div className="border-l border-red-900/30 pl-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-white">참여 극장 선택</h3>
+                    <div className="flex items-center gap-2">
+                      <Checkbox 
+                        id="edit-select-all"
+                        checked={filteredTheaters.length > 0 && filteredTheaters.every(t => editSelectedTheaters.includes(t.theater_id))}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setEditSelectedTheaters(prev => {
+                              const newIds = filteredTheaters.map(t => t.theater_id);
+                              return [...new Set([...prev, ...newIds])];
+                            });
+                          } else {
+                            setEditSelectedTheaters(prev => 
+                              prev.filter(id => !filteredTheaters.some(t => t.theater_id === id))
+                            );
+                          }
+                        }}
+                        className="border-red-600 data-[state=checked]:bg-red-600"
+                      />
+                      <Label htmlFor="edit-select-all" className="text-white cursor-pointer text-sm">
+                        전체 선택 ({editSelectedTheaters.filter(id => filteredTheaters.some(t => t.theater_id === id)).length}/{filteredTheaters.length})
+                      </Label>
+                    </div>
+                  </div>
+                  
+                  {/* Search */}
+                  <div className="relative mb-4">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      type="text"
+                      placeholder="극장명 또는 지역 검색..."
+                      value={theaterSearchQuery}
+                      onChange={(e) => setTheaterSearchQuery(e.target.value)}
+                      className="bg-gray-900 border-red-900/50 text-white pl-10"
+                    />
+                  </div>
+
+                  {/* Theater List */}
+                  <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
+                    {filteredTheaters.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        검색 결과가 없습니다
+                      </div>
+                    ) : (
+                      filteredTheaters.map((theater) => (
+                        <div key={theater.theater_id} className="flex items-center gap-2 bg-gray-900 p-3 rounded-lg border border-red-900/30 hover:border-red-600/50 transition-colors">
+                          <Checkbox 
+                            id={`edit-theater-${theater.theater_id}`}
+                            checked={editSelectedTheaters.includes(theater.theater_id)}
+                            onCheckedChange={() => {
+                              setEditSelectedTheaters(prev => 
+                                prev.includes(theater.theater_id)
+                                  ? prev.filter(id => id !== theater.theater_id)
+                                  : [...prev, theater.theater_id]
+                              );
+                            }}
+                            className="border-red-600 data-[state=checked]:bg-red-600"
+                          />
+                          <Label 
+                            htmlFor={`edit-theater-${theater.theater_id}`} 
+                            className="text-gray-300 cursor-pointer flex items-center gap-2 flex-1"
+                          >
+                            <span className="flex-1">{theater.name}</span>
+                          </Label>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex gap-3 pt-4 mt-6 border-t border-red-900/30 flex-shrink-0">
+              <Button
+                onClick={handleUpdateEvent}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              >
+                수정 완료
+              </Button>
+              <Button
+                onClick={() => setIsEditDialogOpen(false)}
+                variant="outline"
+                className="flex-1 border-red-900/50 text-gray-400 hover:text-white"
+              >
+                취소
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

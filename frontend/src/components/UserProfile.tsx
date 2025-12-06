@@ -2,7 +2,7 @@ import { motion } from 'motion/react';
 import { Calendar, Edit, Film, Clock } from 'lucide-react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
-import { Avatar } from './ui/avatar';
+import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import { Separator } from './ui/separator';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from './ui/dialog';
@@ -10,6 +10,7 @@ import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { useAuth } from '../hooks/useAuth';
 import { viewingRecordsApi, usersApi } from '../lib/api';
+import { uploadImageToS3 } from '../lib/imageUpload';
 import { useEffect, useState } from 'react';
 
 interface UserProfileProps {
@@ -25,6 +26,7 @@ export function UserProfile({ onNavigateToWatchHistory }: UserProfileProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editProfileImage, setEditProfileImage] = useState('');
+  const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
 
   useEffect(() => {
     const fetchRecentRecords = async () => {
@@ -46,7 +48,7 @@ export function UserProfile({ onNavigateToWatchHistory }: UserProfileProps) {
   useEffect(() => {
     if (user) {
       setEditName(user.name || '');
-      setEditProfileImage(user.profile_image || '');
+      setEditProfileImage(user.profileImage || '');
     }
   }, [user]);
 
@@ -87,8 +89,18 @@ export function UserProfile({ onNavigateToWatchHistory }: UserProfileProps) {
               <Card className="bg-black border border-red-900/50 p-6 sticky top-20">
                 {/* Avatar */}
                 <div className="text-center mb-6">
-                  <Avatar className="w-24 h-24 mx-auto mb-4 bg-red-600/20 border-2 border-red-600/50 text-3xl flex items-center justify-center">
-                    {user?.name?.[0] || 'U'}
+                  <Avatar className="w-24 h-24 mx-auto mb-4 border-2 border-red-600/50">
+                    {user?.profileImage && (
+                      <AvatarImage 
+                        src={user.profileImage} 
+                        alt={user?.name || '프로필'}
+                        className="object-cover"
+                        loading="eager"
+                      />
+                    )}
+                    <AvatarFallback className="bg-red-600/20 text-red-600 text-3xl">
+                      {user?.name?.[0] || 'U'}
+                    </AvatarFallback>
                   </Avatar>
                   <h2 className="text-xl mb-2 text-white">{user?.name || '사용자'}</h2>
                   <p className="text-sm text-gray-400">{user?.email || ''}</p>
@@ -108,7 +120,14 @@ export function UserProfile({ onNavigateToWatchHistory }: UserProfileProps) {
                 <Separator className="bg-red-900/50 mb-6" />
 
                 {/* Action Buttons */}
-                <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+                  setIsEditDialogOpen(open);
+                  if (!open && user) {
+                    // 다이얼로그 닫을 때 편집 상태 초기화
+                    setEditName(user.name || '');
+                    setEditProfileImage(user.profileImage || '');
+                  }
+                }}>
                   <DialogTrigger asChild>
                     <Button className="w-full bg-red-600 hover:bg-red-700 text-white">
                       <Edit className="w-4 h-4 mr-2" />
@@ -134,14 +153,41 @@ export function UserProfile({ onNavigateToWatchHistory }: UserProfileProps) {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="edit-profile-image" className="text-gray-300">프로필 이미지 URL</Label>
+                        <Label htmlFor="edit-profile-image" className="text-gray-300">프로필 이미지</Label>
                         <Input 
                           id="edit-profile-image"
-                          value={editProfileImage}
-                          onChange={(e) => setEditProfileImage(e.target.value)}
-                          placeholder="https://..."
+                          type="file"
+                          accept="image/*"
                           className="bg-gray-900 border-red-900/50 text-white mt-2"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              try {
+                                setUploadingProfileImage(true);
+                                const url = await uploadImageToS3(file, 'profiles');
+                                setEditProfileImage(url);
+                              } catch (err) {
+                                alert((err as Error)?.message || '이미지 업로드에 실패했습니다.');
+                              } finally {
+                                setUploadingProfileImage(false);
+                              }
+                            }
+                          }}
+                          disabled={uploadingProfileImage}
                         />
+                        {uploadingProfileImage && (
+                          <p className="text-sm text-gray-400 mt-1">업로드 중...</p>
+                        )}
+                        {editProfileImage && !uploadingProfileImage && (
+                          <div className="mt-2">
+                            <p className="text-sm text-green-400 mb-2">✓ 업로드 완료</p>
+                            <ImageWithFallback
+                              src={editProfileImage}
+                              alt="프로필 미리보기"
+                              className="w-24 h-24 rounded-full object-cover border-2 border-red-600/50"
+                            />
+                          </div>
+                        )}
                       </div>
                       <div className="flex gap-2 pt-4">
                         <Button 

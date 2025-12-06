@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Search, Users } from 'lucide-react';
 import { Card } from './ui/card';
@@ -370,11 +370,24 @@ export function TheaterManagement() {
                                   min="0"
                                   max={totalStock}
                                   placeholder={remainingStock.toString()}
-                                  value={editStock[item.perk_id] || ''}
-                                  onChange={(e) => setEditStock({
-                                    ...editStock,
-                                    [item.perk_id]: Number(e.target.value),
-                                  })}
+                                  value={editStock[item.perk_id] !== undefined ? editStock[item.perk_id] : ''}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    if (value === '') {
+                                      setEditStock({
+                                        ...editStock,
+                                        [item.perk_id]: undefined,
+                                      });
+                                    } else {
+                                      const numValue = Number(value);
+                                      if (!isNaN(numValue) && numValue >= 0) {
+                                        setEditStock({
+                                          ...editStock,
+                                          [item.perk_id]: numValue,
+                                        });
+                                      }
+                                    }
+                                  }}
                                   className="bg-gray-900 border-red-900/50 text-white mt-2"
                                 />
                                 <p className="text-xs text-gray-500 mt-1">

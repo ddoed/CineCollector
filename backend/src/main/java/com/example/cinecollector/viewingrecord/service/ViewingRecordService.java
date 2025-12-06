@@ -111,7 +111,7 @@ public class ViewingRecordService {
                 .recordId(origin.getRecordId())
                 .userId(origin.getUserId())
                 .movieId(origin.getMovieId())
-                .theaterId(origin.getTheaterId())
+                .theaterId(dto.getTheaterId() != null ? dto.getTheaterId() : origin.getTheaterId())
                 .viewDate(dto.getViewDate() != null ? dto.getViewDate() : origin.getViewDate())
                 .review(dto.getReview() != null ? dto.getReview() : origin.getReview())
                 .isPublic(dto.getIsPublic() != null ? dto.getIsPublic() : origin.getIsPublic())
