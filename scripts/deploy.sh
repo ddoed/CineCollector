@@ -158,11 +158,44 @@ if [ -f backend/Dockerfile.prod ] && [ -f frontend/Dockerfile.prod ]; then
         if [ -n "$BOOT_JAR" ] && [ -f "$BOOT_JAR" ]; then
             cp "$BOOT_JAR" backend/app.jar
             echo "✅ Backend bootJar를 app.jar로 복사 완료"
+            echo "   원본: $BOOT_JAR"
+            echo "   복사본: backend/app.jar ($(ls -lh backend/app.jar 2>/dev/null | awk '{print $5}' || echo '파일 크기 확인 실패'))"
+            
+            # 파일 존재 확인
+            if [ ! -f "backend/app.jar" ]; then
+                echo "❌ app.jar 파일 복사 실패"
+                exit 1
+            fi
+        else
+            echo "❌ Backend bootJar를 찾을 수 없습니다."
+            echo "build/libs 디렉토리 내용:"
+            ls -la backend/build/libs/ 2>/dev/null || echo "build/libs 디렉토리가 없습니다."
+            exit 1
         fi
+    else
+        echo "❌ backend/build/libs 디렉토리가 없습니다."
+        exit 1
     fi
     
     # docker-compose.yml에서 Dockerfile 경로 변경
     sed -i 's|dockerfile: Dockerfile|dockerfile: Dockerfile.prod|g' docker-compose.yml
+fi
+
+# Docker 이미지 빌드 전 파일 확인
+echo "📋 Docker 빌드 전 파일 확인..."
+if [ -f "backend/Dockerfile.prod" ]; then
+    if [ ! -f "backend/app.jar" ]; then
+        echo "❌ backend/app.jar 파일이 없습니다. Docker 빌드를 진행할 수 없습니다."
+        exit 1
+    fi
+    echo "✅ backend/app.jar 확인됨"
+fi
+if [ -f "frontend/Dockerfile.prod" ]; then
+    if [ ! -d "frontend/build" ]; then
+        echo "❌ frontend/build 디렉토리가 없습니다. Docker 빌드를 진행할 수 없습니다."
+        exit 1
+    fi
+    echo "✅ frontend/build 확인됨"
 fi
 
 # Docker 이미지 빌드
