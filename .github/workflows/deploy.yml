@@ -80,6 +80,10 @@ jobs:
           
           # EC2에서 git pull 및 배포 실행
           ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ConnectTimeout=60 -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -e
+            
+            echo "🚀 CineCollector 배포 시작..."
+            
             # 배포 디렉토리 생성
             mkdir -p ~/cinecollector
             cd ~/cinecollector
@@ -94,17 +98,14 @@ jobs:
             # Git 저장소 확인 및 초기화
             if [ ! -d ".git" ]; then
               echo "📥 Git 저장소가 없습니다. 클론 중..."
-              # 기존 파일이 있으면 백업
               if [ "$(ls -A . 2>/dev/null)" ]; then
                 echo "⚠️  기존 파일을 백업합니다..."
                 mkdir -p ../cinecollector_backup
                 mv * ../cinecollector_backup/ 2>/dev/null || true
                 mv .* ../cinecollector_backup/ 2>/dev/null || true
               fi
-              # Git 저장소 클론
               git clone https://github.com/${{ github.repository }}.git .
             else
-              # Git pull로 최신 코드 가져오기
               echo "📥 최신 코드 가져오는 중..."
               git fetch origin
               git reset --hard origin/main
@@ -122,19 +123,143 @@ jobs:
               echo "✅ .env 파일 복원 완료"
             fi
             
-            # 배포 스크립트 실행
-            if [ -f "scripts/deploy.sh" ]; then
-              chmod +x scripts/deploy.sh
-              ./scripts/deploy.sh
-            else
-              echo "❌ 배포 스크립트를 찾을 수 없습니다."
-              echo "현재 디렉토리: $(pwd)"
-              echo "파일 목록:"
-              ls -la
-              echo "scripts 디렉토리:"
-              ls -la scripts/ 2>/dev/null || echo "scripts 디렉토리가 없습니다."
+            # .env 파일 확인
+            if [ ! -f .env ]; then
+              echo "❌ .env 파일이 없습니다. 배포를 중단합니다."
               exit 1
             fi
+            
+            # ========== Backend 배포 ==========
+            echo ""
+            echo "🔨 Backend 배포 시작..."
+            
+            cd backend
+            
+            # Docker 이미지 빌드
+            echo "📦 Backend Docker 이미지 빌드 중..."
+            docker build -t cinecollector-backend .
+            
+            # 기존 컨테이너 중지 및 제거
+            echo "🛑 기존 Backend 컨테이너 중지 중..."
+            docker stop cinecollector-backend 2>/dev/null || true
+            docker rm cinecollector-backend 2>/dev/null || true
+            
+            # 새 컨테이너 실행
+            echo "▶️  Backend 컨테이너 시작 중..."
+            docker run --rm -d -p 8080:8080 \
+              --env-file ../.env \
+              --name cinecollector-backend \
+              --add-host=host.docker.internal:host-gateway \
+              cinecollector-backend
+            
+            echo "✅ Backend 배포 완료!"
+            
+            cd ..
+            
+            # ========== Frontend 배포 ==========
+            echo ""
+            echo "🔨 Frontend 배포 시작..."
+            
+            cd frontend
+            
+            # Frontend 빌드
+            if [ -f "package.json" ]; then
+              echo "📦 Frontend 의존성 설치 중..."
+              npm ci
+              
+              echo "🔨 Frontend 빌드 실행 중..."
+              npm run build
+              
+              if [ ! -d "build" ]; then
+                echo "❌ Frontend 빌드 디렉토리(build)가 생성되지 않았습니다."
+                exit 1
+              fi
+              echo "✅ Frontend 빌드 완료: $(du -sh build | cut -f1)"
+            else
+              echo "⚠️  frontend/package.json 파일을 찾을 수 없습니다."
+              exit 1
+            fi
+            
+            # Nginx 설정 파일 생성
+            echo "📝 Nginx 설정 파일 생성 중..."
+            sudo tee /etc/nginx/sites-available/cinecollector > /dev/null <<NGINX_EOF
+            server {
+                listen 80;
+                server_name _;
+                root $HOME/cinecollector/frontend/build;
+                index index.html;
+            
+                # Gzip 압축 설정
+                gzip on;
+                gzip_vary on;
+                gzip_min_length 1024;
+                gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml+rss application/json application/javascript;
+            
+                # 정적 파일 캐싱
+                location ~* \.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$ {
+                    expires 1y;
+                    add_header Cache-Control "public, immutable";
+                }
+            
+                # SPA 라우팅을 위한 설정
+                location / {
+                    try_files \$uri \$uri/ /index.html;
+                }
+            
+                # API 프록시 설정
+                location /api {
+                    proxy_pass http://localhost:8080;
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade \$http_upgrade;
+                    proxy_set_header Connection 'upgrade';
+                    proxy_set_header Host \$host;
+                    proxy_set_header X-Real-IP \$remote_addr;
+                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto \$scheme;
+                    proxy_cache_bypass \$http_upgrade;
+                }
+            }
+            NGINX_EOF
+            
+            # Nginx 사이트 활성화
+            sudo ln -sf /etc/nginx/sites-available/cinecollector /etc/nginx/sites-enabled/
+            sudo rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+            
+            # Nginx 설정 테스트 및 재시작
+            echo "🔄 Nginx 재시작 중..."
+            sudo nginx -t && sudo systemctl reload nginx
+            
+            echo "✅ Frontend 배포 완료!"
+            
+            cd ..
+            
+            # 헬스 체크
+            echo ""
+            echo "🏥 헬스 체크 중..."
+            sleep 10
+            
+            # Backend 헬스 체크
+            if curl -f http://localhost:8080/actuator/health > /dev/null 2>&1 || curl -f http://localhost:8080 > /dev/null 2>&1; then
+              echo "✅ Backend가 정상적으로 실행 중입니다."
+            else
+              echo "⚠️  Backend 헬스 체크 실패. 로그를 확인해주세요."
+              docker logs cinecollector-backend
+            fi
+            
+            # Frontend 헬스 체크
+            if curl -f http://localhost:80 > /dev/null 2>&1; then
+              echo "✅ Frontend가 정상적으로 실행 중입니다."
+            else
+              echo "⚠️  Frontend 헬스 체크 실패. Nginx 로그를 확인해주세요."
+              sudo tail -n 20 /var/log/nginx/error.log
+            fi
+            
+            echo ""
+            echo "✅ 배포 완료!"
+            echo ""
+            echo "📊 실행 상태:"
+            docker ps | grep cinecollector-backend || echo "Backend 컨테이너를 찾을 수 없습니다."
+            sudo systemctl status nginx --no-pager -l | head -n 5
           EOF
 
       - name: Cleanup
