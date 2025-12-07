@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
+// 프로덕션: /api 사용 (Nginx 프록시)
+// 개발: 환경 변수 또는 /api 사용 (Vite proxy)
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
 const ACCESS_TOKEN_KEY = 'cinecollector:access_token';
 const REFRESH_TOKEN_KEY = 'cinecollector:refresh_token';
