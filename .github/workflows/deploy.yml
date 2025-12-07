@@ -167,6 +167,10 @@ jobs:
               echo "📦 Frontend 의존성 설치 중..."
               npm ci
               
+              # 이전 빌드 캐시 삭제
+              echo "🧹 이전 빌드 캐시 삭제 중..."
+              rm -rf build node_modules/.vite
+              
               echo "🔨 Frontend 빌드 실행 중..."
               npm run build
               
@@ -175,6 +179,14 @@ jobs:
                 exit 1
               fi
               echo "✅ Frontend 빌드 완료: $(du -sh build | cut -f1)"
+              
+              # 빌드된 파일에서 API_BASE_URL 확인 (디버깅용)
+              echo "🔍 빌드된 파일 확인 중..."
+              if grep -r "localhost:8080" build/ 2>/dev/null; then
+                echo "⚠️  경고: 빌드된 파일에 localhost:8080이 포함되어 있습니다!"
+              else
+                echo "✅ 빌드된 파일에 localhost:8080이 없습니다 (정상)"
+              fi
             else
               echo "⚠️  frontend/package.json 파일을 찾을 수 없습니다."
               exit 1
@@ -207,6 +219,19 @@ jobs:
                 }
             
                 # API 프록시 설정
+                location /api/ {
+                    proxy_pass http://localhost:8080/;
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade \$http_upgrade;
+                    proxy_set_header Connection 'upgrade';
+                    proxy_set_header Host \$host;
+                    proxy_set_header X-Real-IP \$remote_addr;
+                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto \$scheme;
+                    proxy_cache_bypass \$http_upgrade;
+                }
+                
+                # /api로 시작하는 요청도 처리 (슬래시 없이)
                 location /api {
                     proxy_pass http://localhost:8080;
                     proxy_http_version 1.1;
