@@ -386,7 +386,12 @@ export function Landing({ onLogin }: LandingProps) {
       </Dialog>
 
       {/* Login Dialog */}
-      <Dialog open={showLogin} onOpenChange={setShowLogin}>
+      <Dialog open={showLogin} onOpenChange={(open) => {
+        setShowLogin(open);
+        if (open) {
+          resetLoginFields();
+        }
+      }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>로그인</DialogTitle>

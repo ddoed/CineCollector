@@ -217,7 +217,7 @@ export function EventsPerks() {
                         
                         <div className="space-y-2 text-sm">
                           <div className="flex items-center gap-2 text-gray-400">
-                            <Calendar className="w-4 h-4" />
+                            <Calendar className="w-4 h-4 text-gray-200" />
                             <span>{event.start_date} ~ {event.end_date}</span>
                           </div>
                           {event.perks && event.perks.length > 0 && (
@@ -291,7 +291,7 @@ export function EventsPerks() {
                         {getStatusBadge(eventDetail.status)}
                         <div className="mt-4 space-y-2 text-sm">
                           <div className="flex items-center gap-2 text-gray-400">
-                            <Calendar className="w-4 h-4" />
+                            <Calendar className="w-4 h-4 text-gray-200" />
                             <span>{eventDetail.start_date} ~ {eventDetail.end_date}</span>
                           </div>
                           {eventDetail.week_no && (

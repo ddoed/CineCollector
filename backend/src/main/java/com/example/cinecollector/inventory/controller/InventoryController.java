@@ -19,36 +19,6 @@ public class InventoryController {
 
     private final InventoryService inventoryService;
 
-    @PostMapping
-    public ResponseEntity<ApiResponse<InventoryResponseDto>> createInventory(
-            @AuthenticationPrincipal CustomUserDetails userDetails,
-            @Valid @RequestBody InventoryCreateRequestDto dto
-    ) {
-        Long userId = userDetails.getUser().getUserId();
-        InventoryResponseDto responseDto = inventoryService.createInventory(userId, dto);
-        return ResponseEntity.ok(ApiResponse.success(responseDto));
-    }
-
-    @PatchMapping("/{perkId}")
-    public ResponseEntity<ApiResponse<InventoryResponseDto>> updateInventory(
-            @AuthenticationPrincipal CustomUserDetails userDetails,
-            @PathVariable Long perkId,
-            @Valid @RequestBody InventoryUpdateRequestDto dto
-    ) {
-        InventoryResponseDto responseDto = inventoryService.update(userDetails.getUser().getUserId(), perkId, dto);
-        return ResponseEntity.ok(ApiResponse.success(responseDto));
-    }
-
-    @DeleteMapping("/{perkId}")
-    public ResponseEntity<ApiResponse<Void>> deleteInventory(
-            @AuthenticationPrincipal CustomUserDetails userDetails,
-            @PathVariable Long perkId
-    ) {
-        Long userId = userDetails.getUser().getUserId();
-        inventoryService.deleteInventory(userId, perkId);
-        return ResponseEntity.ok(ApiResponse.success(null));
-    }
-
     @PostMapping("/theaters")
     public ResponseEntity<ApiResponse<Void>> selectTheaters(
             @AuthenticationPrincipal CustomUserDetails userDetails,

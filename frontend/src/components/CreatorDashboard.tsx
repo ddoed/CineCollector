@@ -776,7 +776,7 @@ export function CreatorDashboard() {
                               <h3 className="mb-1 text-white">{event.movie?.title || '영화 제목'}</h3>
                               <p className="text-sm text-gray-400 mb-2">{event.title}</p>
                               <div className="flex items-center gap-1 text-xs text-gray-400">
-                                <Calendar className="w-3 h-3" />
+                                <Calendar className="w-3 h-3 text-gray-200" />
                                 {event.start_date} ~ {event.end_date}
                               </div>
                             </div>

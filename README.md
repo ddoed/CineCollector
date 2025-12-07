@@ -257,10 +257,11 @@ CineCollector/
 ## 개발 환경 설정
 
 ### 사전 요구사항
-- Java 21 이상
-- Node.js 18 이상
-- PostgreSQL 12 이상
-- Gradle 8.0 이상 (또는 Gradle Wrapper 사용)
+- **Java**: 21 이상
+- **Node.js**: 18 이상
+- **PostgreSQL**: 12 이상
+- **Gradle**: 8.0 이상 (또는 Gradle Wrapper 사용)
+- **AWS S3**: 이미지 저장용 (선택사항, 개발 환경에서는 로컬 파일 시스템 사용 가능)
 
 ### Backend 설정
 
@@ -294,7 +295,8 @@ gradlew.bat bootRun
 백엔드는 `http://localhost:8080`에서 실행됩니다.
 
 4. **API 문서 확인**
-Swagger UI: `http://localhost:8080/swagger-ui.html`
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- API 문서: `http://localhost:8080/v3/api-docs`
 
 ### Frontend 설정
 
@@ -315,18 +317,47 @@ VITE_API_BASE_URL=http://localhost:8080
 npm run dev
 ```
 
-프론트엔드는 `http://localhost:5173` (또는 `http://localhost:3000`)에서 실행됩니다.
+프론트엔드는 `http://localhost:3000`에서 실행됩니다.
 
 4. **프로덕션 빌드**
 ```bash
 npm run build
+# 빌드된 파일: frontend/dist/
 ```
+
+### 초기 데이터
+
+프로젝트 실행 시 `schema.sql`과 `data.sql`이 자동으로 실행되어 데이터베이스 스키마와 초기 데이터가 생성됩니다.
+
+**초기 사용자 계정** (data.sql에 정의됨):
+- **COLLECTOR**: collector1@example.com / password: collector1
+- **THEATER**: theater1@example.com / password: theater1
+- **CREATOR**: creator1@example.com (메가박스) / password: creator1
+- **CREATOR**: creator2@example.com (CGV) / password: creator2
+- **CREATOR**: creator3@example.com (롯데시네마) / password: creator3
+
+### 문제 해결
+
+#### 백엔드 실행 오류
+- **데이터베이스 연결 실패**: `application.yaml`의 데이터베이스 연결 정보 확인
+- **포트 충돌**: 8080 포트가 사용 중인 경우 `application.yaml`에서 포트 변경
+- **환경 변수 누락**: 필수 환경 변수 설정 확인
+
+#### 프론트엔드 실행 오류
+- **의존성 설치 실패**: `npm install` 재실행 또는 `node_modules` 삭제 후 재설치
+- **API 연결 실패**: 백엔드가 실행 중인지 확인, `VITE_API_BASE_URL` 환경 변수 확인
+- **CORS 오류**: 백엔드의 CORS 설정 확인
+
+#### 데이터베이스 오류
+- **스키마 생성 실패**: PostgreSQL 버전 확인 (12 이상 필요)
+- **역할 생성 실패**: `DatabaseRoleInitializer`가 자동으로 역할을 생성하지만, 수동 생성도 가능
+- **GRANT 오류**: `application.yaml`에서 `spring.sql.init.continue-on-error: true` 설정 확인
 
 ---
 
 ## 데이터베이스 스키마
 
-주요 테이블:
+### 주요 테이블 (11개)
 - `users` - 사용자 정보
 - `movies` - 영화 정보
 - `events` - 이벤트 정보
@@ -338,6 +369,22 @@ npm run build
 - `viewingrecord_image` - 관람 기록 이미지
 - `viewing_record_perk` - 관람 기록별 특전
 - `perk_applications` - 특전 신청 내역
+
+### View (3개)
+- `user_collection_statistics` - 사용자별 수집 통계
+- `event_detail_view` - 이벤트 상세 정보
+- `theater_inventory_summary` - 극장별 재고 요약
+
+### Index (22개)
+- 단일 컬럼 인덱스: 20개
+- 복합 인덱스: 1개 (`idx_events_dates`)
+- 부분 인덱스: 1개 (`idx_viewing_records_public`)
+- **참고**: 복합 Primary Key를 가진 테이블(`inventories`, `collections`, `viewing_record_perk`)은 Primary Key가 자동으로 인덱스 역할을 수행합니다.
+
+### 제약조건
+- Primary Keys: 11개 (단일 8개, 복합 3개)
+- Foreign Keys: 15개
+- Unique Constraints: 1개 (users.email)
 
 자세한 스키마는 `backend/src/main/resources/schema.sql` 참조
 
@@ -419,6 +466,22 @@ chore: 빌드 설정 등
 - 실제 프로젝트 개발 프로세스 경험
 
 **본 프로젝트는 상업적 목적이 아니며, 실제 서비스로 운영되지 않습니다.**
+
+### 데이터베이스 기능 구현
+
+본 프로젝트는 다음 데이터베이스 기능을 구현했습니다:
+
+- **DML**: INSERT, UPDATE, DELETE (24개 위치)
+- **SFW**: SELECT FROM WHERE (69개 위치)
+- **ORDER BY**: 정렬 기능 (23개 위치)
+- **GROUP BY**: 집계 함수와 함께 사용 (1개 위치 + View)
+- **HAVING**: 수집 완료/미수집 필터링 (2개 위치)
+- **Subquery**: EXISTS 서브쿼리 (1개 위치)
+- **Keys**: Primary Key, Foreign Key (45개 제약조건)
+- **View**: 복잡한 조회 쿼리 단순화 (3개 View)
+- **Authorization**: Spring Security + GRANT/REVOKE (30개 GRANT)
+- **Transaction**: @Transactional 어노테이션 (42개 위치)
+- **Index**: 쿼리 성능 최적화 (22개 Index)
 
 ### 라이선스
 이 프로젝트는 교육 목적의 학술 프로젝트입니다.

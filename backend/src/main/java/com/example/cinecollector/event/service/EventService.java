@@ -75,17 +75,6 @@ public class EventService {
         return EventResponseDto.from(update);
     }
 
-    public EventResponseDto getEvent(Long eventId) {
-        Event e = eventRepository.findById(eventId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.EVENT_NOT_FOUND));
-        return EventResponseDto.from(e);
-    }
-
-    public List<EventResponseDto> getAllEvent() {
-        return eventRepository.findAll().stream()
-                .map(EventResponseDto::from)
-                .toList();
-    }
 
     @Transactional
     public void deleteEvent(Long userId, Long eventId) {

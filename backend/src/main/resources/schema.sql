@@ -281,27 +281,57 @@ CREATE INDEX IF NOT EXISTS idx_movies_genre ON movies(genre);  -- 장르별 필�
 
 -- Database Authorization (GRANT/REVOKE)
 -- 역할별 데이터베이스 권한 설정
--- 참고: 실제 사용 시에는 운영 환경에 맞게 사용자와 역할을 생성해야 합니다.
+-- Spring Boot의 SQL 스크립트 파서는 DO $$ 블록을 처리할 수 있도록 각 블록을 개별 문장으로 분리
+
+-- 역할 생성 (이미 존재하면 무시)
+-- PostgreSQL에서는 CREATE ROLE IF NOT EXISTS를 지원하지 않으므로
+-- 역할이 없을 경우를 대비해 GRANT 문에서 에러를 무시하도록 continue-on-error 설정
+-- 역할은 수동으로 생성하거나 애플리케이션 초기화 시 별도로 처리해야 합니다.
+-- 
+-- 역할 생성 방법 (PostgreSQL에서 직접 실행):
+-- CREATE ROLE collector_role;
+-- CREATE ROLE theater_role;
+-- CREATE ROLE creator_role;
+-- CREATE ROLE admin_role;
 
 -- COLLECTOR 역할: 자신의 데이터만 조회/수정 가능
--- GRANT SELECT, INSERT, UPDATE ON collections TO collector_role;
--- GRANT SELECT, INSERT, UPDATE, DELETE ON viewing_records TO collector_role;
--- GRANT SELECT ON movies, events, perks, theaters, inventories TO collector_role;
+GRANT SELECT, INSERT, UPDATE ON collections TO collector_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON viewing_records TO collector_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON viewingrecord_image TO collector_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON viewing_record_perk TO collector_role;
+GRANT SELECT ON movies TO collector_role;
+GRANT SELECT ON events TO collector_role;
+GRANT SELECT ON perks TO collector_role;
+GRANT SELECT ON theaters TO collector_role;
+GRANT SELECT ON inventories TO collector_role;
+GRANT SELECT, INSERT ON perk_applications TO collector_role;
 
 -- THEATER 역할: 자신의 극장 재고만 관리 가능
--- GRANT SELECT, INSERT, UPDATE ON inventories TO theater_role;
--- GRANT SELECT, UPDATE ON theaters TO theater_role;
--- GRANT SELECT ON movies, events, perks, collections TO theater_role;
+GRANT SELECT, INSERT, UPDATE ON inventories TO theater_role;
+GRANT SELECT, UPDATE ON theaters TO theater_role;
+GRANT SELECT ON movies TO theater_role;
+GRANT SELECT ON events TO theater_role;
+GRANT SELECT ON perks TO theater_role;
+GRANT SELECT ON collections TO theater_role;
+GRANT SELECT ON perk_applications TO theater_role;
 
 -- CREATOR 역할: 자신이 생성한 이벤트와 특전만 관리 가능
--- GRANT SELECT, INSERT, UPDATE, DELETE ON events TO creator_role;
--- GRANT SELECT, INSERT, UPDATE, DELETE ON perks TO creator_role;
--- GRANT SELECT, INSERT, UPDATE ON inventories TO creator_role;
--- GRANT SELECT ON movies, theaters, collections TO creator_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON events TO creator_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON perks TO creator_role;
+GRANT SELECT, INSERT, UPDATE ON inventories TO creator_role;
+GRANT SELECT ON movies TO creator_role;
+GRANT SELECT ON theaters TO creator_role;
+GRANT SELECT ON collections TO creator_role;
+GRANT SELECT ON perk_applications TO creator_role;
 
 -- ADMIN 역할: 모든 권한
--- GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO admin_role;
--- GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO admin_role;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO admin_role;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO admin_role;
+
+-- View에 대한 권한 부여
+GRANT SELECT ON user_collection_statistics TO collector_role, theater_role, creator_role, admin_role;
+GRANT SELECT ON event_detail_view TO collector_role, theater_role, creator_role, admin_role;
+GRANT SELECT ON theater_inventory_summary TO theater_role, creator_role, admin_role;
 
 -- Transaction 예시 (명시적 트랜잭션)
 -- Spring의 @Transactional 어노테이션은 자동으로 BEGIN/COMMIT/ROLLBACK을 처리합니다.

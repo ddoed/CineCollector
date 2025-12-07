@@ -29,11 +29,6 @@ public class EventController {
         return ResponseEntity.ok(ApiResponse.success(responseDto));
     }
 
-    @GetMapping
-    public ResponseEntity<ApiResponse<List<EventResponseDto>>> getAllEvent() {
-        return ResponseEntity.ok(ApiResponse.success(eventService.getAllEvent()));
-    }
-
     @GetMapping("/list")
     public ResponseEntity<ApiResponse<List<EventListDto>>> getEventList(
             @RequestParam(required = false, defaultValue = "전체") String status,
@@ -42,11 +37,6 @@ public class EventController {
     ) {
         List<EventListDto> list = eventService.getEventList(status, movieTitle, eventTitle);
         return ResponseEntity.ok(ApiResponse.success(list));
-    }
-
-    @GetMapping("/{eventId}")
-    public ResponseEntity<ApiResponse<EventResponseDto>> getEvent(@PathVariable Long eventId) {
-        return ResponseEntity.ok(ApiResponse.success(eventService.getEvent(eventId)));
     }
 
     @GetMapping("/{eventId}/detail")

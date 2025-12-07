@@ -41,13 +41,13 @@ VALUES ('극장판 주술회전: 회옥·옥절', '2025-10-16', '애니메이션
 
 -- Events 예시 데이터 (creator_id는 users의 user_id 참조)
 INSERT INTO events (movie_id, creator_id, title, start_date, end_date, week_no, image)
-VALUES (1, 7, '<8번 출구> 개봉5주차 주중 현장 증정 이벤트', '2025-11-19', '2025-11-21', 5, 'https://comtogether.s3.ap-southeast-2.amazonaws.com/8%EB%B2%88%EC%B6%9C%EA%B5%AC_%EC%A3%BC%EC%A4%91_%EC%9D%B4%EB%B2%A4%ED%8A%B8.jpg');
+VALUES (1, 7, '<8번 출구> 개봉5주차 주중 현장 증정 이벤트', '2025-11-19', '2025-12-21', 5, 'https://comtogether.s3.ap-southeast-2.amazonaws.com/8%EB%B2%88%EC%B6%9C%EA%B5%AC_%EC%A3%BC%EC%A4%91_%EC%9D%B4%EB%B2%A4%ED%8A%B8.jpg');
 INSERT INTO events (movie_id, creator_id, title, start_date, end_date, week_no, image)
-VALUES (1, 7, '<8번 출구> 개봉5주차 주말 현장 증정 이벤트', '2025-11-22', '2025-11-23', 5, 'https://comtogether.s3.ap-southeast-2.amazonaws.com/string/8%EB%B2%88%EC%B6%9C%EA%B5%AC_%EC%A3%BC%EB%A7%90_%EC%9D%B4%EB%B2%A4%ED%8A%B8.jpg');
+VALUES (1, 7, '<8번 출구> 개봉5주차 주말 현장 증정 이벤트', '2025-11-22', '2025-12-23', 5, 'https://comtogether.s3.ap-southeast-2.amazonaws.com/string/8%EB%B2%88%EC%B6%9C%EA%B5%AC_%EC%A3%BC%EB%A7%90_%EC%9D%B4%EB%B2%A4%ED%8A%B8.jpg');
 INSERT INTO events (movie_id, creator_id, title, start_date, end_date, week_no, image)
 VALUES (2, 8, '<주토피아 2> 1주차 현장 이벤트', '2025-11-26', '2025-12-02', 1, 'https://comtogether.s3.ap-southeast-2.amazonaws.com/string/%EC%A3%BC%ED%86%A0%ED%94%BC%EC%95%84_%EC%9D%B4%EB%B2%A4%ED%8A%B8.jpg');
 INSERT INTO events (movie_id, creator_id, title, start_date, end_date, week_no, image)
-VALUES (3, 9, '<나우 유 씨 미 3> 2주차 현장 증정 이벤트', '2025-11-19', '2025-11-25', 2, 'https://comtogether.s3.ap-southeast-2.amazonaws.com/string/%EB%82%98%EC%9A%B0%EC%9C%A0%EC%94%A8%EB%AF%B8_%EC%9D%B4%EB%B2%A4%ED%8A%B8.jpg');
+VALUES (3, 9, '<나우 유 씨 미 3> 2주차 현장 증정 이벤트', '2025-12-19', '2025-11-25', 2, 'https://comtogether.s3.ap-southeast-2.amazonaws.com/string/%EB%82%98%EC%9A%B0%EC%9C%A0%EC%94%A8%EB%AF%B8_%EC%9D%B4%EB%B2%A4%ED%8A%B8.jpg');
 INSERT INTO events (movie_id, creator_id, title, start_date, end_date, week_no, image)
 VALUES (4,7,'<극장판 체인소 맨: 레제편> 개봉 9주차 주중 현장 증정 이벤트','2025-11-19','2025-11-21',9,'https://comtogether.s3.ap-southeast-2.amazonaws.com/string/%EC%B2%B4%EC%9D%B8%EC%86%8C%EB%A7%A8_%EC%9D%B4%EB%B2%A4%ED%8A%B8.jpg');
 INSERT INTO events (movie_id, creator_id, title, start_date, end_date, week_no, image)

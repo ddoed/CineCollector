@@ -765,7 +765,7 @@ export function WatchHistory() {
                       )}
                       <div className="space-y-1 text-sm text-gray-400">
                         <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4" />
+                          <Calendar className="w-4 h-4 text-gray-200" />
                           {record.viewing_date || record.view_date || '-'}
                         </div>
                         {record.theater_name && (
