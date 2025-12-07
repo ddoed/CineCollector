@@ -6,8 +6,8 @@ COPY . .
 
 RUN gradle clean build -x test 
 
-# bootJar 파일 찾기 (plain JAR 제외)
-RUN find /app/build/libs -name "*.jar" ! -name "*-plain.jar" -exec cp {} /app/server.jar \;
+# bootJar 파일 찾기 (plain JAR 제외) - 첫 번째 매칭 파일만 사용
+RUN find /app/build/libs -name "*.jar" ! -name "*-plain.jar" | head -1 | xargs -I {} cp {} /app/server.jar
 
 FROM eclipse-temurin:21-jre-alpine
 
