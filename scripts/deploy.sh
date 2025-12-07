@@ -54,7 +54,48 @@ else
     exit 1
 fi
 
-# 이미지 빌드 (EC2에서 직접 빌드)
+# Frontend 빌드 (EC2에서 직접 빌드)
+if [ -d "frontend" ]; then
+    echo "🔨 Frontend 빌드 중..."
+    cd frontend
+    if [ -f "package.json" ]; then
+        # Node.js 설치 확인
+        if ! command -v node &> /dev/null; then
+            echo "📦 Node.js 설치 중..."
+            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+        fi
+        npm ci
+        npm run build
+    fi
+    cd ..
+fi
+
+# Backend 빌드 (EC2에서 직접 빌드)
+if [ -d "backend" ]; then
+    echo "🔨 Backend 빌드 중..."
+    cd backend
+    if [ -f "build.gradle" ]; then
+        # Java 설치 확인
+        if ! command -v java &> /dev/null; then
+            echo "📦 Java 21 설치 중..."
+            sudo apt-get update
+            sudo apt-get install -y openjdk-21-jdk
+        fi
+        chmod +x ./gradlew
+        ./gradlew build -x test
+    fi
+    cd ..
+fi
+
+# 프로덕션 Dockerfile이 있으면 사용 (빌드된 파일 사용)
+if [ -f backend/Dockerfile.prod ] && [ -f frontend/Dockerfile.prod ]; then
+    echo "📦 프로덕션 Dockerfile 사용 (이미 빌드된 파일 사용)"
+    # docker-compose.yml에서 Dockerfile 경로 변경
+    sed -i 's|dockerfile: Dockerfile|dockerfile: Dockerfile.prod|g' docker-compose.yml
+fi
+
+# Docker 이미지 빌드
 echo "🔨 Docker 이미지 빌드 중..."
 docker-compose build --no-cache
 
