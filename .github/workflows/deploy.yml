@@ -167,9 +167,19 @@ jobs:
               echo "📦 Frontend 의존성 설치 중..."
               npm ci
               
-              # 이전 빌드 캐시 삭제
-              echo "🧹 이전 빌드 캐시 삭제 중..."
-              rm -rf build node_modules/.vite
+              # 이전 빌드 캐시 완전 삭제
+              echo "🧹 이전 빌드 캐시 완전 삭제 중..."
+              rm -rf build dist node_modules/.vite .vite
+              
+              # API_BASE_URL 확인 (빌드 전)
+              echo "🔍 API_BASE_URL 설정 확인 중..."
+              if grep -q "localhost:8080" src/lib/api.ts 2>/dev/null; then
+                echo "❌ 오류: src/lib/api.ts에 localhost:8080이 있습니다!"
+                cat src/lib/api.ts | head -5
+                exit 1
+              else
+                echo "✅ src/lib/api.ts 확인 완료 (localhost:8080 없음)"
+              fi
               
               echo "🔨 Frontend 빌드 실행 중..."
               npm run build
@@ -180,12 +190,19 @@ jobs:
               fi
               echo "✅ Frontend 빌드 완료: $(du -sh build | cut -f1)"
               
-              # 빌드된 파일에서 API_BASE_URL 확인 (디버깅용)
+              # 빌드된 파일에서 localhost:8080 확인 (디버깅용)
               echo "🔍 빌드된 파일 확인 중..."
-              if grep -r "localhost:8080" build/ 2>/dev/null; then
+              if grep -r "localhost:8080" build/ 2>/dev/null | grep -v "node_modules" | head -5; then
                 echo "⚠️  경고: 빌드된 파일에 localhost:8080이 포함되어 있습니다!"
+                echo "빌드된 파일 내용 확인:"
+                grep -r "localhost:8080" build/ 2>/dev/null | grep -v "node_modules" | head -3
               else
                 echo "✅ 빌드된 파일에 localhost:8080이 없습니다 (정상)"
+              fi
+              
+              # /api 사용 확인
+              if grep -r '"/api' build/ 2>/dev/null | head -1; then
+                echo "✅ 빌드된 파일에서 /api 사용 확인됨"
               fi
             else
               echo "⚠️  frontend/package.json 파일을 찾을 수 없습니다."
