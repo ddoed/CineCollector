@@ -1,4 +1,4 @@
-FROM gradle:8.7-jdk21-alpine as build
+FROM gradle:8.7-jdk21-alpine AS build
 
 WORKDIR /app
 
@@ -6,11 +6,14 @@ COPY . .
 
 RUN gradle clean build -x test 
 
+# bootJar 파일 찾기 (plain JAR 제외)
+RUN find /app/build/libs -name "*.jar" ! -name "*-plain.jar" -exec cp {} /app/server.jar \;
+
 FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-# bootJar만 복사 (plain JAR 제외)
-COPY --from=build /app/build/libs/*-SNAPSHOT.jar server.jar
+# 빌드된 JAR 파일 복사
+COPY --from=build /app/server.jar server.jar
 
 CMD ["java", "-jar","./server.jar"]
