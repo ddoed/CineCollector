@@ -131,13 +131,15 @@ if [ -d "backend" ]; then
         chmod +x ./gradlew
         ./gradlew build -x test
         
-        # 빌드된 JAR 파일 확인
-        if [ ! -f "build/libs/"*.jar ]; then
+        # 빌드된 JAR 파일 확인 (plain JAR 제외, bootJar만 확인)
+        JAR_FILE=$(ls build/libs/*.jar 2>/dev/null | grep -v plain || echo "")
+        if [ -z "$JAR_FILE" ] || [ ! -f "$JAR_FILE" ]; then
             echo "❌ Backend JAR 파일이 생성되지 않았습니다."
             echo "빌드 로그를 확인하세요."
+            ls -la build/libs/ 2>/dev/null || echo "build/libs 디렉토리가 없습니다."
             exit 1
         fi
-        echo "✅ Backend 빌드 완료: $(ls -lh build/libs/*.jar | awk '{print $5}')"
+        echo "✅ Backend 빌드 완료: $(ls -lh "$JAR_FILE" | awk '{print $5}')"
     else
         echo "⚠️  backend/build.gradle 파일을 찾을 수 없습니다."
     fi
@@ -149,6 +151,16 @@ fi
 # 프로덕션 Dockerfile이 있으면 사용 (빌드된 파일 사용)
 if [ -f backend/Dockerfile.prod ] && [ -f frontend/Dockerfile.prod ]; then
     echo "📦 프로덕션 Dockerfile 사용 (이미 빌드된 파일 사용)"
+    
+    # Backend: bootJar를 app.jar로 복사 (Dockerfile.prod에서 사용)
+    if [ -d "backend/build/libs" ]; then
+        BOOT_JAR=$(ls backend/build/libs/*.jar 2>/dev/null | grep -v plain | head -1)
+        if [ -n "$BOOT_JAR" ] && [ -f "$BOOT_JAR" ]; then
+            cp "$BOOT_JAR" backend/app.jar
+            echo "✅ Backend bootJar를 app.jar로 복사 완료"
+        fi
+    fi
+    
     # docker-compose.yml에서 Dockerfile 경로 변경
     sed -i 's|dockerfile: Dockerfile|dockerfile: Dockerfile.prod|g' docker-compose.yml
 fi
