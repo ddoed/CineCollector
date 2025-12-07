@@ -40,19 +40,14 @@ if [ ! -f .env ]; then
     fi
 fi
 
-# Docker 및 Docker Compose 설치 확인
+# Docker 설치 확인
 if ! command -v docker &> /dev/null; then
     echo "📦 Docker 설치 중..."
     curl -fsSL https://get.docker.com -o get-docker.sh
     sudo sh get-docker.sh
     sudo usermod -aG docker $USER
     rm get-docker.sh
-fi
-
-if ! command -v docker-compose &> /dev/null; then
-    echo "📦 Docker Compose 설치 중..."
-    sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    sudo chmod +x /usr/local/bin/docker-compose
+    echo "✅ Docker 설치 완료"
 fi
 
 # PostgreSQL 설치 확인 및 설정
@@ -69,144 +64,134 @@ if ! command -v psql &> /dev/null; then
     
     # 데이터베이스 생성 (필요한 경우)
     sudo -u postgres psql -c "CREATE DATABASE cinecollector;" || echo "데이터베이스가 이미 존재합니다."
+    echo "✅ PostgreSQL 설치 완료"
 fi
 
+# Nginx 설치 확인 (Frontend용)
+if ! command -v nginx &> /dev/null; then
+    echo "📦 Nginx 설치 중..."
+    sudo apt-get update
+    sudo apt-get install -y nginx
+    sudo systemctl start nginx
+    sudo systemctl enable nginx
+    echo "✅ Nginx 설치 완료"
+fi
+
+# Node.js 설치 확인 (Frontend 빌드용)
+if ! command -v node &> /dev/null; then
+    echo "📦 Node.js 설치 중..."
+    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+    sudo apt-get install -y nodejs
+    echo "✅ Node.js 설치 완료"
+fi
+
+# ========== Backend 배포 ==========
+echo ""
+echo "🔨 Backend 배포 시작..."
+
+cd backend
+
+# Docker 이미지 빌드
+echo "📦 Backend Docker 이미지 빌드 중..."
+docker build -t cinecollector-backend .
+
 # 기존 컨테이너 중지 및 제거
-echo "🛑 기존 컨테이너 중지 중..."
-if [ -f docker-compose.yml ]; then
-    docker-compose down || true
+echo "🛑 기존 Backend 컨테이너 중지 중..."
+docker stop cinecollector-backend 2>/dev/null || true
+docker rm cinecollector-backend 2>/dev/null || true
+
+# 새 컨테이너 실행
+echo "▶️  Backend 컨테이너 시작 중..."
+docker run --rm -d -p 8080:8080 \
+    --env-file ../.env \
+    --name cinecollector-backend \
+    --add-host=host.docker.internal:host-gateway \
+    cinecollector-backend
+
+echo "✅ Backend 배포 완료!"
+
+cd ..
+
+# ========== Frontend 배포 ==========
+echo ""
+echo "🔨 Frontend 배포 시작..."
+
+cd frontend
+
+# Frontend 빌드
+if [ -f "package.json" ]; then
+    echo "📦 Frontend 의존성 설치 중..."
+    npm ci
+    
+    echo "🔨 Frontend 빌드 실행 중..."
+    npm run build
+    
+    # 빌드 디렉토리 확인
+    if [ ! -d "build" ]; then
+        echo "❌ Frontend 빌드 디렉토리(build)가 생성되지 않았습니다."
+        exit 1
+    fi
+    echo "✅ Frontend 빌드 완료: $(du -sh build | cut -f1)"
 else
-    echo "⚠️  docker-compose.yml 파일을 찾을 수 없습니다."
+    echo "⚠️  frontend/package.json 파일을 찾을 수 없습니다."
     exit 1
 fi
 
-# Frontend 빌드 (EC2에서 직접 빌드)
-if [ -d "frontend" ]; then
-    echo "🔨 Frontend 빌드 중..."
-    cd frontend
-    if [ -f "package.json" ]; then
-        # Node.js 설치 확인
-        if ! command -v node &> /dev/null; then
-            echo "📦 Node.js 설치 중..."
-            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-            sudo apt-get install -y nodejs
-        fi
-        
-        # 의존성 설치
-        echo "📦 Frontend 의존성 설치 중..."
-        npm ci
-        
-        # 빌드 실행
-        echo "🔨 Frontend 빌드 실행 중..."
-        npm run build
-        
-        # 빌드 디렉토리 확인
-        if [ ! -d "build" ]; then
-            echo "❌ Frontend 빌드 디렉토리(build)가 생성되지 않았습니다."
-            echo "빌드 로그를 확인하세요."
-            exit 1
-        fi
-        echo "✅ Frontend 빌드 완료: $(du -sh build | cut -f1)"
-    else
-        echo "⚠️  frontend/package.json 파일을 찾을 수 없습니다."
-    fi
-    cd ..
-else
-    echo "⚠️  frontend 디렉토리를 찾을 수 없습니다."
-fi
+# Nginx 설정 파일 생성
+echo "📝 Nginx 설정 파일 생성 중..."
+sudo tee /etc/nginx/sites-available/cinecollector > /dev/null <<EOF
+server {
+    listen 80;
+    server_name _;
+    root $DEPLOY_DIR/frontend/build;
+    index index.html;
 
-# Backend 빌드 (EC2에서 직접 빌드)
-if [ -d "backend" ]; then
-    echo "🔨 Backend 빌드 중..."
-    cd backend
-    if [ -f "build.gradle" ]; then
-        # Java 설치 확인
-        if ! command -v java &> /dev/null; then
-            echo "📦 Java 21 설치 중..."
-            sudo apt-get update
-            sudo apt-get install -y openjdk-21-jdk
-        fi
-        
-        # Gradle 빌드 실행
-        chmod +x ./gradlew
-        ./gradlew build -x test
-        
-        # 빌드된 JAR 파일 확인 (plain JAR 제외, bootJar만 확인)
-        JAR_FILE=$(ls build/libs/*.jar 2>/dev/null | grep -v plain || echo "")
-        if [ -z "$JAR_FILE" ] || [ ! -f "$JAR_FILE" ]; then
-            echo "❌ Backend JAR 파일이 생성되지 않았습니다."
-            echo "빌드 로그를 확인하세요."
-            ls -la build/libs/ 2>/dev/null || echo "build/libs 디렉토리가 없습니다."
-            exit 1
-        fi
-        echo "✅ Backend 빌드 완료: $(ls -lh "$JAR_FILE" | awk '{print $5}')"
-    else
-        echo "⚠️  backend/build.gradle 파일을 찾을 수 없습니다."
-    fi
-    cd ..
-else
-    echo "⚠️  backend 디렉토리를 찾을 수 없습니다."
-fi
+    # Gzip 압축 설정
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml+rss application/json application/javascript;
 
-# 프로덕션 Dockerfile이 있으면 사용 (빌드된 파일 사용)
-if [ -f backend/Dockerfile.prod ] && [ -f frontend/Dockerfile.prod ]; then
-    echo "📦 프로덕션 Dockerfile 사용 (이미 빌드된 파일 사용)"
-    
-    # Backend: bootJar를 app.jar로 복사 (Dockerfile.prod에서 사용)
-    if [ -d "backend/build/libs" ]; then
-        BOOT_JAR=$(ls backend/build/libs/*.jar 2>/dev/null | grep -v plain | head -1)
-        if [ -n "$BOOT_JAR" ] && [ -f "$BOOT_JAR" ]; then
-            cp "$BOOT_JAR" backend/app.jar
-            echo "✅ Backend bootJar를 app.jar로 복사 완료"
-            echo "   원본: $BOOT_JAR"
-            echo "   복사본: backend/app.jar ($(ls -lh backend/app.jar 2>/dev/null | awk '{print $5}' || echo '파일 크기 확인 실패'))"
-            
-            # 파일 존재 확인
-            if [ ! -f "backend/app.jar" ]; then
-                echo "❌ app.jar 파일 복사 실패"
-                exit 1
-            fi
-        else
-            echo "❌ Backend bootJar를 찾을 수 없습니다."
-            echo "build/libs 디렉토리 내용:"
-            ls -la backend/build/libs/ 2>/dev/null || echo "build/libs 디렉토리가 없습니다."
-            exit 1
-        fi
-    else
-        echo "❌ backend/build/libs 디렉토리가 없습니다."
-        exit 1
-    fi
-    
-    # docker-compose.yml에서 Dockerfile 경로 변경
-    sed -i 's|dockerfile: Dockerfile|dockerfile: Dockerfile.prod|g' docker-compose.yml
-fi
+    # 정적 파일 캐싱
+    location ~* \.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
 
-# Docker 이미지 빌드 전 파일 확인
-echo "📋 Docker 빌드 전 파일 확인..."
-if [ -f "backend/Dockerfile.prod" ]; then
-    if [ ! -f "backend/app.jar" ]; then
-        echo "❌ backend/app.jar 파일이 없습니다. Docker 빌드를 진행할 수 없습니다."
-        exit 1
-    fi
-    echo "✅ backend/app.jar 확인됨"
-fi
-if [ -f "frontend/Dockerfile.prod" ]; then
-    if [ ! -d "frontend/build" ]; then
-        echo "❌ frontend/build 디렉토리가 없습니다. Docker 빌드를 진행할 수 없습니다."
-        exit 1
-    fi
-    echo "✅ frontend/build 확인됨"
-fi
+    # SPA 라우팅을 위한 설정
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
 
-# Docker 이미지 빌드
-echo "🔨 Docker 이미지 빌드 중..."
-docker-compose build --no-cache
+    # API 프록시 설정
+    location /api {
+        proxy_pass http://localhost:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
 
-# 컨테이너 시작
-echo "▶️  컨테이너 시작 중..."
-docker-compose up -d
+# Nginx 사이트 활성화
+sudo ln -sf /etc/nginx/sites-available/cinecollector /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+
+# Nginx 설정 테스트 및 재시작
+echo "🔄 Nginx 재시작 중..."
+sudo nginx -t && sudo systemctl reload nginx
+
+echo "✅ Frontend 배포 완료!"
+
+cd ..
 
 # 헬스 체크
+echo ""
 echo "🏥 헬스 체크 중..."
 sleep 10
 
@@ -215,20 +200,23 @@ if curl -f http://localhost:8080/actuator/health > /dev/null 2>&1 || curl -f htt
     echo "✅ Backend가 정상적으로 실행 중입니다."
 else
     echo "⚠️  Backend 헬스 체크 실패. 로그를 확인해주세요."
-    docker-compose logs backend
+    docker logs cinecollector-backend
 fi
 
 # Frontend 헬스 체크
 if curl -f http://localhost:80 > /dev/null 2>&1; then
     echo "✅ Frontend가 정상적으로 실행 중입니다."
 else
-    echo "⚠️  Frontend 헬스 체크 실패. 로그를 확인해주세요."
-    docker-compose logs frontend
+    echo "⚠️  Frontend 헬스 체크 실패. Nginx 로그를 확인해주세요."
+    sudo tail -n 20 /var/log/nginx/error.log
 fi
 
+echo ""
 echo "✅ 배포 완료!"
-echo "📊 컨테이너 상태:"
-docker-compose ps
+echo ""
+echo "📊 실행 상태:"
+docker ps | grep cinecollector-backend || echo "Backend 컨테이너를 찾을 수 없습니다."
+sudo systemctl status nginx --no-pager -l | head -n 5
 
 echo ""
 echo "🌐 접속 정보:"

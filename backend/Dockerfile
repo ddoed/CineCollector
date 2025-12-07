@@ -1,31 +1,16 @@
-# Backend Dockerfile
-FROM eclipse-temurin:21-jdk-alpine AS build
+FROM gradle:8.7-jdk21-alpine as build
 
 WORKDIR /app
 
-# Gradle wrapper 및 설정 파일 복사
-COPY gradlew .
-COPY gradle gradle
-COPY build.gradle .
-COPY settings.gradle .
+COPY . .
 
-# 소스 코드 복사
-COPY src src
+RUN gradle clean build -x test 
 
-# Gradle 빌드 실행
-RUN chmod +x ./gradlew
-RUN ./gradlew build -x test
-
-# 런타임 이미지
 FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-# 빌드된 JAR 파일 복사
-COPY --from=build /app/build/libs/*.jar app.jar
+# bootJar만 복사 (plain JAR 제외)
+COPY --from=build /app/build/libs/*-SNAPSHOT.jar server.jar
 
-# 포트 노출
-EXPOSE 8080
-
-# 애플리케이션 실행
-ENTRYPOINT ["java", "-jar", "app.jar"]
+CMD ["java", "-jar","./server.jar"]
