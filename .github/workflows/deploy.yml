@@ -21,13 +21,19 @@ jobs:
 
       - name: Setup SSH
         run: |
+          # SSH 디렉토리 생성
           mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          
+          # SSH 키 저장
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
-          # SSH KeepAlive 설정
-          echo "ServerAliveInterval 60" >> ~/.ssh/config
-          echo "ServerAliveCountMax 3" >> ~/.ssh/config
+          
+          # known_hosts 설정
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          chmod 644 ~/.ssh/known_hosts || true
+          
+          echo "✅ SSH setup completed"
 
       - name: Build Frontend
         working-directory: ./frontend
@@ -64,12 +70,14 @@ jobs:
 
       - name: Deploy to EC2
         run: |
+          set -e
+          
           # EC2에 배포 패키지 전송 (압축하여 전송)
           tar -czf deploy.tar.gz -C deploy .
-          scp -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -i ~/.ssh/deploy_key deploy.tar.gz ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/
+          scp -o StrictHostKeyChecking=yes -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -i ~/.ssh/deploy_key deploy.tar.gz ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/
           
           # EC2에서 배포 스크립트 실행
-          ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ConnectTimeout=30 -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          ssh -o StrictHostKeyChecking=yes -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ConnectTimeout=30 -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
             # 배포 디렉토리 생성
             mkdir -p ~/cinecollector
             cd ~/cinecollector
