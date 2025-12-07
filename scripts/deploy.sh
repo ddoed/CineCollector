@@ -10,8 +10,34 @@ cd "$DEPLOY_DIR"
 
 # 환경 변수 파일 확인
 if [ ! -f .env ]; then
-    echo "⚠️  .env 파일이 없습니다. .env.example을 참고하여 .env 파일을 생성해주세요."
-    exit 1
+    echo "⚠️  .env 파일이 없습니다."
+    
+    # 백업에서 .env 파일 복원 시도
+    if [ -f ../cinecollector_backup/.env ]; then
+        echo "📋 백업에서 .env 파일 복원 중..."
+        cp ../cinecollector_backup/.env .env
+        echo "✅ .env 파일 복원 완료"
+    elif [ -f .env.example ]; then
+        echo "📋 .env.example을 기반으로 .env 파일을 생성합니다."
+        echo "⚠️  실제 값으로 수정이 필요합니다!"
+        cp .env.example .env
+        echo "✅ .env 파일 생성 완료 (값 수정 필요)"
+        echo ""
+        echo "⚠️  중요: .env 파일을 실제 값으로 수정한 후 다시 배포하세요."
+        echo "   nano .env"
+        exit 1
+    else
+        echo "❌ .env 파일이 없고 백업도 없습니다."
+        echo ""
+        echo "다음 명령으로 .env 파일을 생성하세요:"
+        echo "  nano .env"
+        echo ""
+        echo "필수 환경 변수:"
+        echo "  - DB_URL, DB_USERNAME, DB_PASSWORD"
+        echo "  - JWT_SECRET"
+        echo "  - AWS_ACCESS_KEY, AWS_SECRET_KEY, BUCKET_NAME, BUCKET_REGION"
+        exit 1
+    fi
 fi
 
 # Docker 및 Docker Compose 설치 확인

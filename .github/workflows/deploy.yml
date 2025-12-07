@@ -84,11 +84,18 @@ jobs:
             mkdir -p ~/cinecollector
             cd ~/cinecollector
             
+            # .env 파일 미리 백업 (git 작업 전에)
+            if [ -f .env ]; then
+              echo "💾 .env 파일 백업 중..."
+              cp .env ../.env.backup
+              echo "✅ .env 파일 백업 완료"
+            fi
+            
             # Git 저장소 확인 및 초기화
             if [ ! -d ".git" ]; then
               echo "📥 Git 저장소가 없습니다. 클론 중..."
               # 기존 파일이 있으면 백업
-              if [ "$(ls -A .)" ]; then
+              if [ "$(ls -A . 2>/dev/null)" ]; then
                 echo "⚠️  기존 파일을 백업합니다..."
                 mkdir -p ../cinecollector_backup
                 mv * ../cinecollector_backup/ 2>/dev/null || true
@@ -102,6 +109,17 @@ jobs:
               git fetch origin
               git reset --hard origin/main
               git clean -fd
+            fi
+            
+            # .env 파일 복원 (git 작업 후)
+            if [ -f ../.env.backup ]; then
+              echo "📋 .env 파일 복원 중..."
+              cp ../.env.backup .env
+              echo "✅ .env 파일 복원 완료"
+            elif [ -f ../cinecollector_backup/.env ]; then
+              echo "📋 백업 디렉토리에서 .env 파일 복원 중..."
+              cp ../cinecollector_backup/.env .env
+              echo "✅ .env 파일 복원 완료"
             fi
             
             # 배포 스크립트 실행
