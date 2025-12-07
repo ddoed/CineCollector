@@ -38,8 +38,10 @@ jobs:
           # 배포 스크립트 복사
           cp scripts/deploy.sh deploy/
           chmod +x deploy/deploy.sh
-          # 환경 변수 템플릿 복사
-          cp env.example deploy/.env.example
+          # 환경 변수 템플릿 복사 (파일이 있는 경우에만)
+          if [ -f env.example ]; then
+            cp env.example deploy/.env.example
+          fi
           # .gitignore 파일 제외하고 필요한 파일만 포함
           find deploy -name ".git" -type d -exec rm -rf {} + 2>/dev/null || true
           find deploy -name "node_modules" -type d -exec rm -rf {} + 2>/dev/null || true
