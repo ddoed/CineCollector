@@ -7,7 +7,7 @@
 *.iml
 
 # Build artifacts
-build
+# build - 프로덕션 Dockerfile에서 사용하므로 제외하지 않음
 .gradle
 
 # Environment files
