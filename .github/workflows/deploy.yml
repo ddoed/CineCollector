@@ -1,0 +1,83 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  EC2_HOST: ${{ secrets.EC2_HOST }}
+  EC2_USER: ${{ secrets.EC2_USER }}
+  EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create deployment package
+        run: |
+          mkdir -p deploy
+          # 소스 코드 복사 (전체 프로젝트)
+          cp -r backend deploy/
+          cp -r frontend deploy/
+          # Docker Compose 및 기타 설정 파일 복사
+          cp docker-compose.yml deploy/
+          cp -r frontend/nginx.conf deploy/frontend/
+          # 배포 스크립트 복사
+          cp scripts/deploy.sh deploy/
+          chmod +x deploy/deploy.sh
+          # 환경 변수 템플릿 복사
+          cp env.example deploy/.env.example
+          # .gitignore 파일 제외하고 필요한 파일만 포함
+          find deploy -name ".git" -type d -exec rm -rf {} + 2>/dev/null || true
+          find deploy -name "node_modules" -type d -exec rm -rf {} + 2>/dev/null || true
+          find deploy -name "build" -type d -exec rm -rf {} + 2>/dev/null || true
+          find deploy -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+
+      - name: Deploy to EC2
+        run: |
+          # EC2에 배포 패키지 전송 (압축하여 전송)
+          tar -czf deploy.tar.gz -C deploy .
+          scp -i ~/.ssh/deploy_key deploy.tar.gz ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/
+          
+          # EC2에서 배포 스크립트 실행
+          ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            # 배포 디렉토리 생성
+            mkdir -p ~/cinecollector
+            cd ~/cinecollector
+            
+            # 기존 파일 백업 (선택사항)
+            if [ -d "backend" ] || [ -d "frontend" ]; then
+              mkdir -p backup
+              mv backend frontend docker-compose.yml backup/ 2>/dev/null || true
+            fi
+            
+            # 새 파일 압축 해제
+            tar -xzf /tmp/deploy.tar.gz -C .
+            rm /tmp/deploy.tar.gz
+            
+            # 배포 스크립트 실행
+            chmod +x deploy.sh
+            ./deploy.sh
+          EOF
+          
+          # 로컬 임시 파일 정리
+          rm -rf deploy deploy.tar.gz
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -rf deploy
+          rm -f ~/.ssh/deploy_key
