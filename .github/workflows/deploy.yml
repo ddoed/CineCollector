@@ -35,73 +35,42 @@ jobs:
           
           echo "✅ SSH setup completed"
 
-      - name: Build Frontend
-        working-directory: ./frontend
-        run: |
-          npm ci
-          npm run build
-
-      - name: Build Backend
-        working-directory: ./backend
-        run: |
-          chmod +x ./gradlew
-          ./gradlew build -x test
-
-      - name: Create deployment package
-        run: |
-          mkdir -p deploy
-          # Backend: 빌드된 JAR만 복사하고 프로덕션 Dockerfile 사용
-          mkdir -p deploy/backend/build/libs
-          cp backend/build/libs/*.jar deploy/backend/build/libs/
-          cp backend/Dockerfile.prod deploy/backend/Dockerfile
-          # Frontend: 빌드된 파일만 복사하고 프로덕션 Dockerfile 사용
-          cp -r frontend/build deploy/frontend/
-          cp frontend/Dockerfile.prod deploy/frontend/Dockerfile
-          cp frontend/nginx.conf deploy/frontend/
-          # Docker Compose 및 기타 설정 파일 복사
-          cp docker-compose.yml deploy/
-          # 배포 스크립트 복사
-          cp scripts/deploy.sh deploy/
-          chmod +x deploy/deploy.sh
-          # 환경 변수 템플릿 복사 (파일이 있는 경우에만)
-          if [ -f env.example ]; then
-            cp env.example deploy/.env.example
-          fi
-
       - name: Deploy to EC2
         run: |
           set -e
           
-          # EC2에 배포 패키지 전송 (압축하여 전송)
-          tar -czf deploy.tar.gz -C deploy .
-          scp -o StrictHostKeyChecking=yes -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -i ~/.ssh/deploy_key deploy.tar.gz ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/
-          
-          # EC2에서 배포 스크립트 실행
+          # EC2에서 git pull 및 배포 실행
           ssh -o StrictHostKeyChecking=yes -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ConnectTimeout=30 -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            # 배포 디렉토리 생성
-            mkdir -p ~/cinecollector
-            cd ~/cinecollector
+            # 배포 디렉토리로 이동
+            cd ~/cinecollector || {
+              echo "⚠️  배포 디렉토리가 없습니다. 초기 설정을 진행합니다..."
+              mkdir -p ~/cinecollector
+              cd ~/cinecollector
+              
+              # Git 저장소 클론 (처음 배포인 경우)
+              if [ ! -d ".git" ]; then
+                echo "📥 Git 저장소 클론 중..."
+                git clone https://github.com/${{ github.repository }}.git .
+              fi
+            }
             
-            # 기존 파일 백업 (선택사항)
-            if [ -d "backend" ] || [ -d "frontend" ]; then
-              mkdir -p backup
-              mv backend frontend docker-compose.yml backup/ 2>/dev/null || true
-            fi
-            
-            # 새 파일 압축 해제
-            tar -xzf /tmp/deploy.tar.gz -C .
-            rm /tmp/deploy.tar.gz
+            # Git pull로 최신 코드 가져오기
+            echo "📥 최신 코드 가져오는 중..."
+            git fetch origin
+            git reset --hard origin/main
+            git clean -fd
             
             # 배포 스크립트 실행
-            chmod +x deploy.sh
-            ./deploy.sh
+            if [ -f "scripts/deploy.sh" ]; then
+              chmod +x scripts/deploy.sh
+              ./scripts/deploy.sh
+            else
+              echo "⚠️  배포 스크립트를 찾을 수 없습니다."
+              exit 1
+            fi
           EOF
-          
-          # 로컬 임시 파일 정리
-          rm -rf deploy deploy.tar.gz
 
       - name: Cleanup
         if: always()
         run: |
-          rm -rf deploy
           rm -f ~/.ssh/deploy_key

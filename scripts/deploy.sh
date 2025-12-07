@@ -54,14 +54,7 @@ else
     exit 1
 fi
 
-# 프로덕션 Dockerfile이 있으면 사용 (GitHub Actions에서 빌드된 파일 사용)
-if [ -f backend/Dockerfile.prod ] && [ -f frontend/Dockerfile.prod ]; then
-    echo "📦 프로덕션 Dockerfile 사용 (이미 빌드된 파일 사용)"
-    # docker-compose.yml에서 Dockerfile 경로 변경
-    sed -i 's|dockerfile: Dockerfile|dockerfile: Dockerfile.prod|g' docker-compose.yml
-fi
-
-# 이미지 빌드
+# 이미지 빌드 (EC2에서 직접 빌드)
 echo "🔨 Docker 이미지 빌드 중..."
 docker-compose build --no-cache
 
