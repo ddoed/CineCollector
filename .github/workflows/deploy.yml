@@ -25,16 +25,35 @@ jobs:
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          # SSH KeepAlive 설정
+          echo "ServerAliveInterval 60" >> ~/.ssh/config
+          echo "ServerAliveCountMax 3" >> ~/.ssh/config
+
+      - name: Build Frontend
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build Backend
+        working-directory: ./backend
+        run: |
+          chmod +x ./gradlew
+          ./gradlew build -x test
 
       - name: Create deployment package
         run: |
           mkdir -p deploy
-          # 소스 코드 복사 (전체 프로젝트)
-          cp -r backend deploy/
-          cp -r frontend deploy/
+          # Backend: 빌드된 JAR만 복사하고 프로덕션 Dockerfile 사용
+          mkdir -p deploy/backend/build/libs
+          cp backend/build/libs/*.jar deploy/backend/build/libs/
+          cp backend/Dockerfile.prod deploy/backend/Dockerfile
+          # Frontend: 빌드된 파일만 복사하고 프로덕션 Dockerfile 사용
+          cp -r frontend/build deploy/frontend/
+          cp frontend/Dockerfile.prod deploy/frontend/Dockerfile
+          cp frontend/nginx.conf deploy/frontend/
           # Docker Compose 및 기타 설정 파일 복사
           cp docker-compose.yml deploy/
-          cp -r frontend/nginx.conf deploy/frontend/
           # 배포 스크립트 복사
           cp scripts/deploy.sh deploy/
           chmod +x deploy/deploy.sh
@@ -42,20 +61,15 @@ jobs:
           if [ -f env.example ]; then
             cp env.example deploy/.env.example
           fi
-          # .gitignore 파일 제외하고 필요한 파일만 포함
-          find deploy -name ".git" -type d -exec rm -rf {} + 2>/dev/null || true
-          find deploy -name "node_modules" -type d -exec rm -rf {} + 2>/dev/null || true
-          find deploy -name "build" -type d -exec rm -rf {} + 2>/dev/null || true
-          find deploy -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
 
       - name: Deploy to EC2
         run: |
           # EC2에 배포 패키지 전송 (압축하여 전송)
           tar -czf deploy.tar.gz -C deploy .
-          scp -i ~/.ssh/deploy_key deploy.tar.gz ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/
+          scp -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -i ~/.ssh/deploy_key deploy.tar.gz ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/
           
           # EC2에서 배포 스크립트 실행
-          ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ConnectTimeout=30 -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
             # 배포 디렉토리 생성
             mkdir -p ~/cinecollector
             cd ~/cinecollector

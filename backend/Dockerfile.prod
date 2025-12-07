@@ -1,0 +1,13 @@
+# Backend Dockerfile (프로덕션 - 이미 빌드된 JAR 사용)
+FROM eclipse-temurin:21-jre-alpine
+
+WORKDIR /app
+
+# 빌드된 JAR 파일 복사 (GitHub Actions에서 이미 빌드됨)
+COPY build/libs/*.jar app.jar
+
+# 포트 노출
+EXPOSE 8080
+
+# 애플리케이션 실행
+ENTRYPOINT ["java", "-jar", "app.jar"]
