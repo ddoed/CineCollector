@@ -91,10 +91,28 @@ if [ -d "frontend" ]; then
             curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
             sudo apt-get install -y nodejs
         fi
+        
+        # 의존성 설치
+        echo "📦 Frontend 의존성 설치 중..."
         npm ci
+        
+        # 빌드 실행
+        echo "🔨 Frontend 빌드 실행 중..."
         npm run build
+        
+        # 빌드 디렉토리 확인
+        if [ ! -d "build" ]; then
+            echo "❌ Frontend 빌드 디렉토리(build)가 생성되지 않았습니다."
+            echo "빌드 로그를 확인하세요."
+            exit 1
+        fi
+        echo "✅ Frontend 빌드 완료: $(du -sh build | cut -f1)"
+    else
+        echo "⚠️  frontend/package.json 파일을 찾을 수 없습니다."
     fi
     cd ..
+else
+    echo "⚠️  frontend 디렉토리를 찾을 수 없습니다."
 fi
 
 # Backend 빌드 (EC2에서 직접 빌드)
@@ -108,10 +126,24 @@ if [ -d "backend" ]; then
             sudo apt-get update
             sudo apt-get install -y openjdk-21-jdk
         fi
+        
+        # Gradle 빌드 실행
         chmod +x ./gradlew
         ./gradlew build -x test
+        
+        # 빌드된 JAR 파일 확인
+        if [ ! -f "build/libs/"*.jar ]; then
+            echo "❌ Backend JAR 파일이 생성되지 않았습니다."
+            echo "빌드 로그를 확인하세요."
+            exit 1
+        fi
+        echo "✅ Backend 빌드 완료: $(ls -lh build/libs/*.jar | awk '{print $5}')"
+    else
+        echo "⚠️  backend/build.gradle 파일을 찾을 수 없습니다."
     fi
     cd ..
+else
+    echo "⚠️  backend 디렉토리를 찾을 수 없습니다."
 fi
 
 # 프로덕션 Dockerfile이 있으면 사용 (빌드된 파일 사용)
