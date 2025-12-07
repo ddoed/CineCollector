@@ -80,31 +80,41 @@ jobs:
           
           # EC2에서 git pull 및 배포 실행
           ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ConnectTimeout=60 -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            # 배포 디렉토리로 이동
-            cd ~/cinecollector || {
-              echo "⚠️  배포 디렉토리가 없습니다. 초기 설정을 진행합니다..."
-              mkdir -p ~/cinecollector
-              cd ~/cinecollector
-              
-              # Git 저장소 클론 (처음 배포인 경우)
-              if [ ! -d ".git" ]; then
-                echo "📥 Git 저장소 클론 중..."
-                git clone https://github.com/${{ github.repository }}.git .
-              fi
-            }
+            # 배포 디렉토리 생성
+            mkdir -p ~/cinecollector
+            cd ~/cinecollector
             
-            # Git pull로 최신 코드 가져오기
-            echo "📥 최신 코드 가져오는 중..."
-            git fetch origin
-            git reset --hard origin/main
-            git clean -fd
+            # Git 저장소 확인 및 초기화
+            if [ ! -d ".git" ]; then
+              echo "📥 Git 저장소가 없습니다. 클론 중..."
+              # 기존 파일이 있으면 백업
+              if [ "$(ls -A .)" ]; then
+                echo "⚠️  기존 파일을 백업합니다..."
+                mkdir -p ../cinecollector_backup
+                mv * ../cinecollector_backup/ 2>/dev/null || true
+                mv .* ../cinecollector_backup/ 2>/dev/null || true
+              fi
+              # Git 저장소 클론
+              git clone https://github.com/${{ github.repository }}.git .
+            else
+              # Git pull로 최신 코드 가져오기
+              echo "📥 최신 코드 가져오는 중..."
+              git fetch origin
+              git reset --hard origin/main
+              git clean -fd
+            fi
             
             # 배포 스크립트 실행
             if [ -f "scripts/deploy.sh" ]; then
               chmod +x scripts/deploy.sh
               ./scripts/deploy.sh
             else
-              echo "⚠️  배포 스크립트를 찾을 수 없습니다."
+              echo "❌ 배포 스크립트를 찾을 수 없습니다."
+              echo "현재 디렉토리: $(pwd)"
+              echo "파일 목록:"
+              ls -la
+              echo "scripts 디렉토리:"
+              ls -la scripts/ 2>/dev/null || echo "scripts 디렉토리가 없습니다."
               exit 1
             fi
           EOF
